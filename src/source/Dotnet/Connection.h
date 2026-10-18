@@ -11,6 +11,10 @@
 
 #include "Core/Platform/PlatformLibrary.h"
 
+#ifdef __EMSCRIPTEN__
+#include "Dotnet/web/WebPacketBuffer.h"
+#endif
+
 class PacketFunctions_ChatServer;
 class PacketFunctions_ConnectServer;
 class PacketFunctions_ClientToServer;
@@ -69,7 +73,12 @@ template <typename T> T LoadManagedSymbol(const char* name)
         return nullptr;
     }
 
+#ifdef __EMSCRIPTEN__
+    // Web build: the library's exports are implemented in Dotnet/web and linked in.
+    const auto symbol = reinterpret_cast<T>(mu::web::FindNetworkSymbol(name));
+#else
     const auto symbol = reinterpret_cast<T>(mu::platform::GetSymbol(munique_client_library_handle, name));
+#endif
     if (!symbol)
     {
         ReportDotNetError(name, DotNetErrorKind::SymbolNotFound);
