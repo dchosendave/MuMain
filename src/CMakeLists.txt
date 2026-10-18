@@ -181,6 +181,21 @@ else()
   list(FILTER MU_CLIENT_SOURCES EXCLUDE REGEX "[/\\]Core[/\\]Platform[/\\]win32[/\\]")
 endif()
 
+# Web (Emscripten) build: no OpenSSL or libcurl in the browser. Core/Platform/web/
+# replaces the credential encryption and the shop downloader with stubs.
+if(EMSCRIPTEN)
+  list(FILTER MU_CLIENT_SOURCES EXCLUDE REGEX "[/\\]Core[/\\]Platform[/\\]PlatformCrypto\\.cpp$")
+  list(FILTER MU_CLIENT_SOURCES EXCLUDE REGEX "[/\\]GameShop[/\\]FileDownloader[/\\]CurlFileDownloader\\.cpp$")
+  # No Crypto++: our data has no version 14 BMD models, so Core/Platform/web/ has a cipher that refuses
+  # them. No launcher either: browser players start from the website, so the launcher check stays native.
+  list(FILTER MU_CLIENT_SOURCES EXCLUDE REGEX "[/\\]Render[/\\]Models[/\\]BmdModulusCipher\\.cpp$")
+  list(FILTER MU_CLIENT_SOURCES EXCLUDE REGEX "[/\\]Core[/\\]Platform[/\\]LauncherToken\\.cpp$")
+else()
+  list(FILTER MU_CLIENT_SOURCES EXCLUDE REGEX "[/\\]Core[/\\]Platform[/\\]web[/\\]")
+  # Dotnet/web replaces MUnique.Client.Library in the browser (WebSockets to MuWeb.Gateway).
+  list(FILTER MU_CLIENT_SOURCES EXCLUDE REGEX "[/\\]Dotnet[/\\]web[/\\]")
+endif()
+
 list(FILTER MU_CLIENT_SOURCES EXCLUDE REGEX "[/\\]Render[/\\]Renderer[/\\]MuRenderer\\.cpp$")
 
 # The downstream renderer is SDL GPU-only. Upstream's retired OpenGL Core
@@ -281,12 +296,16 @@ if(MSVC)
 endif()
 target_compile_definitions(MuClient PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 target_link_libraries(MuClient PUBLIC SDL3::SDL3 glm::glm spdlog::spdlog)
-find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+if(NOT EMSCRIPTEN)
+  find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND MU_LINK_SDL_PLATFORM_BACKENDS)
   # SDL also dlopen()s libvulkan.so.1; the same option makes it a DT_NEEDED entry of Main
   # (linked below) so the loader resolves through the RUNPATH.
   find_package(Vulkan REQUIRED)
 endif()
+# Native builds only: the web build has neither OpenSSL nor Crypto++ (see the source filters above).
+if(NOT EMSCRIPTEN)
 target_link_libraries(MuClient PUBLIC OpenSSL::Crypto)
 # Crypto++: the ciphers of version 14 BMD models (Render/Models/BmdModulusCipher), linked statically so Main
 # needs no Crypto++ library at run time (the release builds ship none). vcpkg ships a CMake package with a
@@ -317,6 +336,7 @@ else()
   target_link_libraries(MuCryptopp INTERFACE "${MU_CRYPTOPP_STATIC_LIBRARY}")
 endif()
 target_link_libraries(MuClient PRIVATE MuCryptopp)
+endif()
 if(TARGET SDL3_ttf::SDL3_ttf)
   target_link_libraries(MuClient PUBLIC SDL3_ttf::SDL3_ttf)
 endif()
@@ -346,8 +366,13 @@ target_compile_definitions(MuClient PUBLIC
 )
 
 # The in-game shop downloader uses libcurl on every platform.
-find_package(CURL REQUIRED)
-target_link_libraries(MuClient PUBLIC CURL::libcurl)
+if(NOT EMSCRIPTEN)
+  find_package(CURL REQUIRED)
+  target_link_libraries(MuClient PUBLIC CURL::libcurl)
+else()
+  # Declaration-only <curl/curl.h> for the shop headers; see Core/Platform/web/.
+  target_include_directories(MuClient PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/source/Core/Platform/web/include")
+endif()
 
 # The engine relies on self-registering globals whose constructors get
 # silently dropped if the linker only pulls archive members on demand, so
@@ -423,6 +448,22 @@ else()
 endif()
 target_compile_features(Main PUBLIC cxx_std_20)
 target_link_libraries(Main PRIVATE MuClient::MuClient)
+if(EMSCRIPTEN)
+  # Browser runtime: WebSockets for the network layer, a growable heap, Asyncify so the
+  # blocking game loop can yield to the browser (emscripten_sleep in MainLoop), and a
+  # thread pool for the client's worker threads (needs the COOP/COEP headers of MuWeb.Gateway).
+  target_link_options(Main PRIVATE
+    "-lwebsocket.js"
+    "-sALLOW_MEMORY_GROWTH=1"
+    "-sINITIAL_MEMORY=512MB"
+    "-sMAXIMUM_MEMORY=4GB"
+    "-sSTACK_SIZE=8MB"
+    "-sASYNCIFY=1"
+    "-sPTHREAD_POOL_SIZE=8"
+    "-sEXIT_RUNTIME=0"
+    "-sEXPORTED_RUNTIME_METHODS=['FS','callMain']"
+  )
+endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND MU_LINK_SDL_PLATFORM_BACKENDS)
   target_link_libraries(Main PRIVATE Vulkan::Vulkan)
 endif()
@@ -555,6 +596,35 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
   )
 endif()
 
+if (EMSCRIPTEN)
+  # Emscripten's libjpeg port lacks the TurboJPEG API, so build libjpeg-turbo with the same
+  # toolchain (static, no SIMD). The client keeps using dependencies/include/turbojpeg.h.
+  include(ExternalProject)
+  set(MU_WEB_TURBOJPEG_PREFIX "${CMAKE_BINARY_DIR}/libjpeg-turbo")
+  set(MU_WEB_TURBOJPEG_LIBRARY "${MU_WEB_TURBOJPEG_PREFIX}/lib/libturbojpeg.a")
+  ExternalProject_Add(libjpeg_turbo_web
+    GIT_REPOSITORY https://github.com/libjpeg-turbo/libjpeg-turbo.git
+    GIT_TAG        3.1.0
+    GIT_SHALLOW    TRUE
+    CMAKE_ARGS
+      "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+      "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
+      "-DCMAKE_INSTALL_PREFIX=${MU_WEB_TURBOJPEG_PREFIX}"
+      "-DCMAKE_INSTALL_LIBDIR=lib"
+      "-DCMAKE_BUILD_TYPE=Release"
+      "-DCMAKE_C_FLAGS=-pthread"
+      "-DENABLE_SHARED=OFF"
+      "-DENABLE_STATIC=ON"
+      "-DWITH_SIMD=OFF"
+      "-DWITH_TURBOJPEG=ON"
+      "-DWITH_TOOLS=OFF"
+      "-DWITH_TESTS=OFF"
+    BUILD_BYPRODUCTS "${MU_WEB_TURBOJPEG_LIBRARY}"
+  )
+  add_dependencies(MuClient libjpeg_turbo_web)
+  target_link_libraries(MuClient PUBLIC "${MU_WEB_TURBOJPEG_LIBRARY}")
+endif()
+
 if (APPLE)
   find_library(TURBOJPEG_LIBRARY NAMES turbojpeg
     PATHS
@@ -679,6 +749,32 @@ add_custom_target(GenWireSizes DEPENDS "${WIRE_SIZES_GEN_HEADER}")
 # header existed and fail (workaround was a manual --target GenWireSizes first).
 add_dependencies(MuClient GenWireSizes)
 
+# Web build: C++ implementations of MUnique.Client.Library's Send* exports, generated from
+# the same OpenMU packet XML the .NET library is generated from (tools/gen_web_packets.py).
+if(EMSCRIPTEN)
+  get_filename_component(_packets_xml_root "${OPENMU_PACKETS_XML}" DIRECTORY)
+  get_filename_component(_packets_xml_root "${_packets_xml_root}" DIRECTORY)
+  set(WEB_PACKETS_GEN_SCRIPT "${REPO_ROOT}/tools/gen_web_packets.py")
+  set(WEB_PACKETS_GEN_SOURCE "${CMAKE_BINARY_DIR}/generated/Dotnet/web/WebPacketBuilders.generated.cpp")
+  add_custom_command(
+    OUTPUT "${WEB_PACKETS_GEN_SOURCE}"
+    COMMAND "${Python3_EXECUTABLE}" "${WEB_PACKETS_GEN_SCRIPT}"
+            --xml-dir "${_packets_xml_root}"
+            --bindings-dir "${CMAKE_CURRENT_SOURCE_DIR}/source/Dotnet"
+            --output "${WEB_PACKETS_GEN_SOURCE}"
+    DEPENDS "${WEB_PACKETS_GEN_SCRIPT}"
+            "${_packets_xml_root}/ClientToServer/ClientToServerPackets.xml"
+            "${_packets_xml_root}/ChatServer/ChatServerPackets.xml"
+            "${_packets_xml_root}/ConnectServer/ConnectServerPackets.xml"
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/Dotnet/PacketBindings_ClientToServer.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/Dotnet/PacketBindings_ChatServer.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/source/Dotnet/PacketBindings_ConnectServer.h"
+    COMMENT "Generating the web packet builders from OpenMU packet XML..."
+    VERBATIM
+  )
+  target_sources(MuClient PRIVATE "${WEB_PACKETS_GEN_SOURCE}")
+endif()
+
 target_include_directories(MuClient PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}/source"
   # source/App holds the moved PCH header (stdafx.h). Keeping App/ on the
@@ -795,6 +891,10 @@ if (DOTNET_EXECUTABLE)
     message(WARNING "Found Linux dotnet but target is Windows. "
       "Cross-OS Native AOT is not supported. MUnique.Client.Library.dll will NOT be built. "
       "Install the Windows .NET SDK or use WSL interop (dotnet.exe) to enable.")
+    set(DOTNET_CAN_BUILD_CLIENT_LIBRARY FALSE)
+  endif()
+  # The browser has no Native AOT target; the web build talks to MuWeb.Gateway instead.
+  if (EMSCRIPTEN)
     set(DOTNET_CAN_BUILD_CLIENT_LIBRARY FALSE)
   endif()
 endif()

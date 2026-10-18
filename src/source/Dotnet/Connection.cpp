@@ -27,8 +27,13 @@ const std::string g_dotnetLibPath = ManagedLibraryPath();
 
 // Defined after g_dotnetLibPath so C++ TU initialization order guarantees the path is
 // fully constructed before Load() is called. (SIOF fix — was inline in Connection.h)
+#ifdef __EMSCRIPTEN__
+// Web build: nothing to load; Dotnet/web provides the exports (see LoadManagedSymbol).
+const mu::platform::LibraryHandle munique_client_library_handle = mu::web::NetworkLibraryHandle();
+#else
 const mu::platform::LibraryHandle munique_client_library_handle =
     mu::platform::Load(g_dotnetLibPath.c_str());
+#endif
 
 namespace
 {

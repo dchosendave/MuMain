@@ -168,6 +168,10 @@ bool g_bDisableAnimationTaskPool = true;
 #include "Render/Text/CUIRenderText.h"
 #include "Core/Input/ImeInput.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
 extern int LogIn;
 extern wchar_t LogInID[];
 extern bool First;
@@ -1689,6 +1693,11 @@ MSG MainLoop()
             WaitForNextActivity(precise == TIMERR_NOERROR);
         }
 
+#ifdef __EMSCRIPTEN__
+        // The browser only runs its event loop (input, WebSockets, presenting) when we return
+        // to it; Asyncify unwinds this loop here and resumes it on the next tick.
+        emscripten_sleep(0);
+#endif
     } // while (!Destroy)
 
     Core::Input::Synthetic::SetEventDelivery(nullptr, nullptr);
