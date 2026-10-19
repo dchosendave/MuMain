@@ -17,6 +17,18 @@ option(MU_ENABLE_SHADER_COMPILATION
 
 include(FetchContent)
 
+# Web build: JSPI lets the game loop yield to the browser without Asyncify's rewrite of the whole
+# binary (a third smaller), but needs a browser with JavaScript Promise Integration (not Safari),
+# and nothing between it and the yield may be a JavaScript frame: exceptions and setjmp/longjmp are
+# compiled to WebAssembly's own instead of Emscripten's JavaScript trampolines, in every target.
+option(MU_WEB_JSPI "Web build: yield with JSPI instead of Asyncify" OFF)
+set(MU_WEB_EXCEPTION_FLAGS "")
+if(EMSCRIPTEN AND MU_WEB_JSPI)
+    set(MU_WEB_EXCEPTION_FLAGS -fwasm-exceptions -sSUPPORT_LONGJMP=wasm)
+    add_compile_options(${MU_WEB_EXCEPTION_FLAGS})
+    add_link_options(${MU_WEB_EXCEPTION_FLAGS})
+endif()
+
 set(MU_SHADER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/shaders")
 set(MU_SHADER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders")
 set(MU_SHADER_COMPILED_DIR "${MU_SHADER_SOURCE_DIR}/compiled")

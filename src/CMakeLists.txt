@@ -444,17 +444,23 @@ endif()
 target_compile_features(Main PUBLIC cxx_std_20)
 target_link_libraries(Main PRIVATE MuClient::MuClient)
 if(EMSCRIPTEN)
-  # Browser runtime: WebSockets for the network layer, a growable heap, Asyncify so the
-  # blocking game loop can yield to the browser (emscripten_sleep in MainLoop), and a
+  # Browser runtime: WebSockets for the network layer, a growable heap, Asyncify or JSPI so the
+  # blocking game loop can yield to the browser (MainLoop waits for the display frame), and a
   # thread pool for the client's worker threads (needs the COOP/COEP headers of MuWeb.Gateway).
+  if(MU_WEB_JSPI)
+    target_link_options(Main PRIVATE "-sJSPI=1")
+  else()
+    target_link_options(Main PRIVATE "-sASYNCIFY=1")
+  endif()
   target_link_options(Main PRIVATE
     "--use-port=emdawnwebgpu"
     "-lwebsocket.js"
+    # Not -sGROWABLE_ARRAYBUFFERS, which the linker suggests: WebGPU rejects views of a resizable
+    # buffer ("The provided ArrayBuffer value must not be resizable" in setBindGroup).
     "-sALLOW_MEMORY_GROWTH=1"
     "-sINITIAL_MEMORY=512MB"
     "-sMAXIMUM_MEMORY=4GB"
     "-sSTACK_SIZE=8MB"
-    "-sASYNCIFY=1"
     "-sPTHREAD_POOL_SIZE=8"
     "-sEXIT_RUNTIME=0"
     "-sEXPORTED_RUNTIME_METHODS=['FS','callMain']"
@@ -598,6 +604,8 @@ if (EMSCRIPTEN)
   include(ExternalProject)
   set(MU_WEB_TURBOJPEG_PREFIX "${CMAKE_BINARY_DIR}/libjpeg-turbo")
   set(MU_WEB_TURBOJPEG_LIBRARY "${MU_WEB_TURBOJPEG_PREFIX}/lib/libturbojpeg.a")
+  # libjpeg's error handling is setjmp/longjmp, which has to match the client's (MU_WEB_JSPI).
+  list(JOIN MU_WEB_EXCEPTION_FLAGS " " _turbojpeg_extra_flags)
   ExternalProject_Add(libjpeg_turbo_web
     GIT_REPOSITORY https://github.com/libjpeg-turbo/libjpeg-turbo.git
     GIT_TAG        3.1.0
@@ -608,7 +616,7 @@ if (EMSCRIPTEN)
       "-DCMAKE_INSTALL_PREFIX=${MU_WEB_TURBOJPEG_PREFIX}"
       "-DCMAKE_INSTALL_LIBDIR=lib"
       "-DCMAKE_BUILD_TYPE=Release"
-      "-DCMAKE_C_FLAGS=-pthread"
+      "-DCMAKE_C_FLAGS=-pthread ${_turbojpeg_extra_flags}"
       "-DENABLE_SHARED=OFF"
       "-DENABLE_STATIC=ON"
       "-DWITH_SIMD=OFF"
