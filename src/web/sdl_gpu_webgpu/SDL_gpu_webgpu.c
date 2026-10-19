@@ -69,6 +69,7 @@ typedef struct WebGPUTexture
     WGPUTexture texture;
     WGPUTextureFormat format;
     WGPUTextureView sampleView;
+    Uint64 sampleViewId; // new for every sample view, the identity in the bind group cache
     WGPUTextureView *targetViews; // one per (layer, mip level), created on first use as a target
     Uint32 targetViewCount;
     Uint32 layers; // array layers (6 per cube), or depth for 3D
@@ -79,6 +80,7 @@ typedef struct WebGPUBuffer
 {
     WGPUBuffer buffer;
     Uint32 size;
+    Uint64 id;
 } WebGPUBuffer;
 
 typedef struct WebGPUDownload
@@ -108,6 +110,7 @@ typedef struct WebGPUSampler
 {
     WGPUSampler sampler;
     bool comparison;
+    Uint64 id;
 } WebGPUSampler;
 
 typedef enum WebGPUBindingKind
@@ -156,7 +159,22 @@ typedef struct WebGPUGraphicsPipeline
     Uint32 fragmentBindingCount;
     Uint32 vertexUniforms;
     Uint32 fragmentUniforms;
+    Uint64 id;
 } WebGPUGraphicsPipeline;
+
+// Resource bind groups by what they bind. Keys use object ids, never pointers: a released object's
+// memory can come back as a new object, and a key with its address would find the old bind group.
+#define WEBGPU_BIND_CACHE_SLOTS 4096 // power of two
+#define WEBGPU_BIND_CACHE_MAX_ENTRIES 16
+
+typedef struct WebGPUBindCacheEntry
+{
+    Uint64 pipelineId;
+    Uint32 stage;
+    Uint32 count;
+    Uint64 ids[WEBGPU_BIND_CACHE_MAX_ENTRIES];
+    WGPUBindGroup group;
+} WebGPUBindCacheEntry;
 
 typedef struct WebGPUUniformBlock
 {
@@ -270,6 +288,8 @@ struct WebGPURenderer
     // Upload bytes submitted since the last fence that really waited for the GPU.
     Uint64 unfencedUploadBytes;
 
+    WebGPUBindCacheEntry *bindCache; // WEBGPU_BIND_CACHE_SLOTS, direct mapped
+
     WebGPUWindowData **windows;
     Uint32 windowCount;
     Uint32 windowCapacity;
@@ -294,6 +314,13 @@ struct WebGPURenderer
 
     int loggedErrors;
 };
+
+// Identities for the bind group cache (WebGPU objects only live on the browser's main thread).
+static Uint64 WebGPU_NextId(void)
+{
+    static Uint64 next = 0;
+    return ++next;
+}
 
 // --- Waiting ------------------------------------------------------------------------------
 
@@ -722,6 +749,7 @@ static WebGPUTexture *WebGPU_CreateTextureInternal(WebGPURenderer *renderer, con
             viewDesc.aspect = WGPUTextureAspect_DepthOnly;
         }
         texture->sampleView = wgpuTextureCreateView(texture->texture, &viewDesc);
+        texture->sampleViewId = WebGPU_NextId();
     }
 
     texture->targetViewCount = (createinfo->type == SDL_GPU_TEXTURETYPE_3D ? 1 : layers) * desc.mipLevelCount;
@@ -807,6 +835,7 @@ static SDL_GPUBuffer *WEBGPU_CreateBuffer(SDL_GPURenderer *driverData, SDL_GPUBu
     WGPUBufferDescriptor desc = WGPU_BUFFER_DESCRIPTOR_INIT;
     WebGPUBuffer *buffer = (WebGPUBuffer *)SDL_calloc(1, sizeof(WebGPUBuffer));
 
+    buffer->id = WebGPU_NextId();
     // Rounded up to 4 bytes so copies of any size can be padded to WebGPU's copy alignment.
     buffer->size = WebGPU_Align(size ? size : 4, 4);
     desc.label = WebGPU_String(debugName);
@@ -951,6 +980,7 @@ static SDL_GPUSampler *WEBGPU_CreateSampler(SDL_GPURenderer *driverData, const S
     WGPUSamplerDescriptor desc = WGPU_SAMPLER_DESCRIPTOR_INIT;
     WebGPUSampler *sampler = (WebGPUSampler *)SDL_calloc(1, sizeof(WebGPUSampler));
 
+    sampler->id = WebGPU_NextId();
     desc.addressModeU = WebGPU_AddressMode(createinfo->address_mode_u);
     desc.addressModeV = WebGPU_AddressMode(createinfo->address_mode_v);
     desc.addressModeW = WebGPU_AddressMode(createinfo->address_mode_w);
@@ -1241,6 +1271,7 @@ static SDL_GPUGraphicsPipeline *WEBGPU_CreateGraphicsPipeline(SDL_GPURenderer *d
     }
 
     pipeline = (WebGPUGraphicsPipeline *)SDL_calloc(1, sizeof(WebGPUGraphicsPipeline));
+    pipeline->id = WebGPU_NextId();
     pipeline->common.num_vertex_samplers = vertexShader->numSamplers;
     pipeline->common.num_vertex_storage_buffers = vertexShader->numStorageBuffers;
     pipeline->common.num_vertex_uniform_buffers = vertexShader->numUniformBuffers;
@@ -1952,6 +1983,7 @@ static WGPUBindGroup WebGPU_CreateResourceGroup(WebGPUCommandBuffer *cb, int sta
     const Uint32 bindingCount = stage == 0 ? pipeline->vertexBindingCount : pipeline->fragmentBindingCount;
     const Uint32 group = stage == 0 ? 0 : 2;
     WGPUBindGroupEntry entries[WEBGPU_MAX_SHADER_BINDINGS];
+    Uint64 ids[WEBGPU_MAX_SHADER_BINDINGS];
     WGPUBindGroupDescriptor desc = WGPU_BIND_GROUP_DESCRIPTOR_INIT;
     Uint32 i, count = 0;
 
@@ -1969,10 +2001,15 @@ static WGPUBindGroup WebGPU_CreateResourceGroup(WebGPUCommandBuffer *cb, int sta
                 texture = renderer->dummyTexture;
             }
             entry.textureView = texture->sampleView;
+            ids[count] = texture->sampleViewId;
         } else if (binding->kind == WEBGPU_BINDING_SAMPLER) {
             const Uint32 slot = binding->binding / 2;
             WebGPUSampler *sampler = slot < WEBGPU_MAX_SAMPLERS ? cb->samplers[stage][slot] : NULL;
-            entry.sampler = (sampler ? sampler : renderer->dummySampler)->sampler;
+            if (!sampler) {
+                sampler = renderer->dummySampler;
+            }
+            entry.sampler = sampler->sampler;
+            ids[count] = sampler->id;
         } else if (binding->kind == WEBGPU_BINDING_STORAGE_BUFFER_KIND) {
             const Uint32 slot = binding->binding - WEBGPU_BINDING_STORAGE_BUFFER;
             WebGPUBuffer *buffer = slot < WEBGPU_MAX_STORAGE_BUFFERS ? cb->storageBuffers[stage][slot] : NULL;
@@ -1982,6 +2019,7 @@ static WGPUBindGroup WebGPU_CreateResourceGroup(WebGPUCommandBuffer *cb, int sta
             entry.buffer = buffer->buffer;
             entry.offset = 0;
             entry.size = buffer->size;
+            ids[count] = buffer->id;
         } else {
             continue;
         }
@@ -1994,10 +2032,37 @@ static WGPUBindGroup WebGPU_CreateResourceGroup(WebGPUCommandBuffer *cb, int sta
     desc.layout = pipeline->resourceLayouts[stage];
     desc.entryCount = count;
     desc.entries = entries;
-    {
+
+    if (count > WEBGPU_BIND_CACHE_MAX_ENTRIES || !renderer->bindCache) {
         WGPUBindGroup group_ = wgpuDeviceCreateBindGroup(renderer->device, &desc);
         WebGPU_AddTransientGroup(cb, group_);
         return group_;
+    }
+
+    {
+        // FNV-1a over the pipeline, the stage and what is bound, in binding order.
+        Uint64 hash = 14695981039346656037ull;
+        WebGPUBindCacheEntry *slot;
+        hash = (hash ^ pipeline->id) * 1099511628211ull;
+        hash = (hash ^ (Uint64)stage) * 1099511628211ull;
+        for (i = 0; i < count; i++) {
+            hash = (hash ^ ids[i]) * 1099511628211ull;
+        }
+        slot = &renderer->bindCache[(hash ^ (hash >> 29)) & (WEBGPU_BIND_CACHE_SLOTS - 1)];
+        if (slot->group && slot->pipelineId == pipeline->id && slot->stage == (Uint32)stage && slot->count == count &&
+            SDL_memcmp(slot->ids, ids, count * sizeof(Uint64)) == 0) {
+            return slot->group;
+        }
+        // A pass that set the evicted group keeps it alive, so it can be released right away.
+        if (slot->group) {
+            wgpuBindGroupRelease(slot->group);
+        }
+        slot->group = wgpuDeviceCreateBindGroup(renderer->device, &desc);
+        slot->pipelineId = pipeline->id;
+        slot->stage = (Uint32)stage;
+        slot->count = count;
+        SDL_memcpy(slot->ids, ids, count * sizeof(Uint64));
+        return slot->group;
     }
 }
 
@@ -2448,6 +2513,7 @@ static void WebGPU_ConfigureSurface(WebGPURenderer *renderer, WebGPUWindowData *
         desc.usage = WGPUTextureUsage_RenderAttachment | WGPUTextureUsage_CopySrc | WGPUTextureUsage_CopyDst | WGPUTextureUsage_TextureBinding;
         back->texture = wgpuDeviceCreateTexture(renderer->device, &desc);
         back->sampleView = wgpuTextureCreateView(back->texture, NULL);
+        back->sampleViewId = WebGPU_NextId();
         back->common.info.width = data->width;
         back->common.info.height = data->height;
     }
@@ -2790,6 +2856,15 @@ static void WEBGPU_DestroyDevice(SDL_GPUDevice *device)
     }
     SDL_free(renderer->freeStaging);
 
+    if (renderer->bindCache) {
+        for (i = 0; i < WEBGPU_BIND_CACHE_SLOTS; i++) {
+            if (renderer->bindCache[i].group) {
+                wgpuBindGroupRelease(renderer->bindCache[i].group);
+            }
+        }
+        SDL_free(renderer->bindCache);
+    }
+
     for (stage = 0; stage < 2; stage++) {
         for (i = 0; i <= WEBGPU_MAX_UNIFORMS; i++) {
             if (renderer->uniformLayouts[stage][i]) {
@@ -2833,6 +2908,8 @@ static void WebGPU_CreateSharedLayouts(WebGPURenderer *renderer)
     renderer->emptyLayout = wgpuDeviceCreateBindGroupLayout(renderer->device, &desc);
     groupDesc.layout = renderer->emptyLayout;
     renderer->emptyGroup = wgpuDeviceCreateBindGroup(renderer->device, &groupDesc);
+    // Without it (out of memory) every resource bind group is created per draw, as before the cache.
+    renderer->bindCache = (WebGPUBindCacheEntry *)SDL_calloc(WEBGPU_BIND_CACHE_SLOTS, sizeof(WebGPUBindCacheEntry));
 
     for (stage = 0; stage < 2; stage++) {
         renderer->uniformLayouts[stage][0] = renderer->emptyLayout;
