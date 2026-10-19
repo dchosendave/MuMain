@@ -188,6 +188,14 @@ static_assert(offsetof(FogUniform, fogPadding) == 24, "FogUniform HLSL cbuffer l
 static_assert(offsetof(FogUniform, fogColor) == 32, "FogUniform HLSL float4 register alignment");
 static_assert(sizeof(FogUniform) == 48, "FogUniform must be 48 bytes (HLSL cbuffer)");
 
+// Shader formats the client ships: SPIR-V, DXIL and MSL blobs, plus WGSL in the web build.
+#ifdef __EMSCRIPTEN__
+constexpr SDL_GPUShaderFormat kMuShaderFormats = SDL_GPU_SHADERFORMAT_PRIVATE;
+#else
+constexpr SDL_GPUShaderFormat kMuShaderFormats =
+    SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL;
+#endif
+
 // ---------------------------------------------------------------------------
 // Returns the absolute path to a compiled shader blob given GPU driver name,
 // shader stage, and shader base name. Uses MU_SHADER_DIR (CMake compile def).
@@ -201,6 +209,11 @@ static_assert(sizeof(FogUniform) == 48, "FogUniform must be 48 bytes (HLSL cbuff
     if (driver && std::string(driver) == "direct3d12")
     {
         ext = "dxil";
+    }
+    else if (driver && std::string(driver) == "webgpu")
+    {
+        // Web build: WGSL ports of the shaders (src/shaders/wgsl), see web/sdl_gpu_webgpu.
+        ext = "wgsl";
     }
     else if (driver && std::string(driver) == "metal")
     {
@@ -239,6 +252,11 @@ static_assert(sizeof(FogUniform) == 48, "FogUniform must be 48 bytes (HLSL cbuff
     if (driver && std::string(driver) == "metal")
     {
         return SDL_GPU_SHADERFORMAT_MSL;
+    }
+    if (driver && std::string(driver) == "webgpu")
+    {
+        // The WebGPU driver takes WGSL text as SDL's "private" shader format.
+        return SDL_GPU_SHADERFORMAT_PRIVATE;
     }
     return SDL_GPU_SHADERFORMAT_SPIRV;
 }
@@ -1809,7 +1827,7 @@ public:
                                      Render::kGpuValidationEnabled ? "enabled" : "disabled",
                                      requestedDriverName ? requestedDriverName : "(SDL auto-pick)");
         s_device =
-            SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL,
+            SDL_CreateGPUDevice(kMuShaderFormats,
                                 Render::kGpuValidationEnabled, requestedDriverName);
 
         if (!s_device && requestedDriverName != nullptr)
@@ -1817,7 +1835,7 @@ public:
             mu::log::Get("render")->warn("SDL_gpu -- '{}' device creation failed ({}), falling back to "
                                          "SDL's own auto-picked driver", requestedDriverName, SDL_GetError());
             s_device = SDL_CreateGPUDevice(
-                SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL,
+                kMuShaderFormats,
                 Render::kGpuValidationEnabled, nullptr);
         }
 

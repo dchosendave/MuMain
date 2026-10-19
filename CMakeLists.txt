@@ -148,6 +148,15 @@ else()
     endforeach()
 endif()
 
+# Web build: WGSL ports of the shaders for the WebGPU SDL GPU driver (src/web/sdl_gpu_webgpu).
+if(EMSCRIPTEN)
+    file(GLOB MU_WGSL_SHADERS CONFIGURE_DEPENDS "${MU_SHADER_SOURCE_DIR}/wgsl/*.wgsl")
+    foreach(wgsl_shader IN LISTS MU_WGSL_SHADERS)
+        get_filename_component(wgsl_name "${wgsl_shader}" NAME)
+        configure_file("${wgsl_shader}" "${MU_SHADER_OUTPUT_DIR}/${wgsl_name}" COPYONLY)
+    endforeach()
+endif()
+
 add_custom_target(ValidateStagedShaderBlobs ALL
     COMMAND "${CMAKE_COMMAND}"
         "-DMU_SHADER_BLOB_DIR=${MU_SHADER_OUTPUT_DIR}"
