@@ -2239,6 +2239,23 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int nC
 
     g_ErrorReport.Write(L"> Start window success.\r\n");
 
+#ifdef __EMSCRIPTEN__
+    // The page sizes the canvas with CSS (the whole tab), so SDL took that size instead of the
+    // configured one. Resizable: SDL then follows the CSS size when the tab resizes and sends
+    // SDL_EVENT_WINDOW_RESIZED, which HandleWindowResize handles like a desktop window resize.
+    SDL_SetWindowResizable(g_sdlWindow, true);
+    {
+        int pageWidth = 0, pageHeight = 0;
+        SDL_GetWindowSize(g_sdlWindow, &pageWidth, &pageHeight);
+        if (pageWidth > 0 && pageHeight > 0)
+        {
+            WindowWidth = static_cast<unsigned int>(pageWidth);
+            WindowHeight = static_cast<unsigned int>(pageHeight);
+            UI::Scaling::SetActiveTransform(UI::Scaling::ScreenOverlayTransform(WindowWidth, WindowHeight));
+        }
+    }
+#endif
+
     OpenglWindowWidth = WindowWidth;
     OpenglWindowHeight = WindowHeight;
 
