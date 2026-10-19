@@ -163,6 +163,24 @@ bool g_bDisableAnimationTaskPool = true;
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+
+// Web build: the browser shows one frame per display refresh, so the game loop runs once per
+// animation frame instead of as often as timers allow (most of those frames were never shown).
+// A hidden tab gets no animation frames; the timer, which the browser slows down there, keeps the
+// client (network, timers) going.
+EM_ASYNC_JS(void, mu_web_wait_for_display_frame, (), {
+    await new Promise(resolve => {
+        let timer = 0;
+        const frame = requestAnimationFrame(() => {
+            clearTimeout(timer);
+            resolve();
+        });
+        timer = setTimeout(() => {
+            cancelAnimationFrame(frame);
+            resolve();
+        }, 100);
+    });
+});
 #endif
 
 extern int LogIn;
@@ -1636,17 +1654,19 @@ MSG MainLoop()
                 ConsumeDiagnosticFrameCapture();
             }
         }
+#ifndef __EMSCRIPTEN__
         else
         {
             // SDL_PollEvent above already drained pending events, so just pace
             // the frame.
             WaitForNextActivity(precise == TIMERR_NOERROR);
         }
-
-#ifdef __EMSCRIPTEN__
+#else
         // The browser only runs its event loop (input, WebSockets, presenting) when we return
-        // to it; Asyncify unwinds this loop here and resumes it on the next tick.
-        emscripten_sleep(0);
+        // to it; Asyncify unwinds this loop here and resumes it on the next display frame.
+        // That paces the loop, so there is no WaitForNextActivity (a sleep there spins the
+        // browser's main thread).
+        mu_web_wait_for_display_frame();
 #endif
     } // while (!Destroy)
 
