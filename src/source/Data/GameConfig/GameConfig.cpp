@@ -111,6 +111,7 @@ void GameConfig::Load()
     m_disableWingShadow = ReadBool(CfgSectionRender, CfgKeyDisableWingShadow, CfgDefaultDisableWingShadow);
     m_disableBodyShadows = ReadBool(CfgSectionRender, CfgKeyDisableBodyShadows, CfgDefaultDisableBodyShadows);
     m_fpsCap = ReadInt(CfgSectionRender, CfgKeyFpsCap, CfgDefaultFpsCap);
+    m_showFpsCounter = ReadBool(CfgSectionRender, CfgKeyShowFpsCounter, CfgDefaultShowFpsCounter);
 
     // Strip keys/sections we used to write but no longer use, so user config
     // files don't accumulate orphans. Append one line per retired key — no
@@ -172,6 +173,7 @@ void GameConfig::Save()
     WriteBool(CfgSectionRender, CfgKeyDisableWingShadow, m_disableWingShadow);
     WriteBool(CfgSectionRender, CfgKeyDisableBodyShadows, m_disableBodyShadows);
     WriteInt(CfgSectionRender, CfgKeyFpsCap, m_fpsCap);
+    WriteBool(CfgSectionRender, CfgKeyShowFpsCounter, m_showFpsCounter);
 }
 
 LookPreset ReadLookPreset(const std::filesystem::path& configFile)
@@ -294,6 +296,11 @@ void GameConfig::SetDisableBodyShadows(bool disabled)
 void GameConfig::SetFpsCap(int fps)
 {
     m_fpsCap = fps;
+}
+
+void GameConfig::SetShowFpsCounter(bool shown)
+{
+    m_showFpsCounter = shown;
 }
 
 void GameConfig::SetRememberMe(bool remember)

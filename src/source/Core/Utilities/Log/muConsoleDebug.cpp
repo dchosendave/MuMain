@@ -4,6 +4,7 @@
 #include <string_view>
 #include "Core/Utilities/Benchmark/BenchConsoleCommand.h"
 #include "Core/Utilities/Log/MuLogger.h"
+#include "Data/GameConfig/GameConfig.h"
 
 #include "muConsoleDebug.h"	// self
 
@@ -349,11 +350,15 @@ bool CmuConsoleDebug::CheckCommand(const std::wstring& strCommand)
     if (strCommand.compare(L"$fpscounter on") == 0)
     {
         SetShowFpsCounter(true);
+        GameConfig::GetInstance().SetShowFpsCounter(true);
+        GameConfig::GetInstance().Save();
         return true;
     }
     else if (strCommand.compare(L"$fpscounter off") == 0)
     {
         SetShowFpsCounter(false);
+        GameConfig::GetInstance().SetShowFpsCounter(false);
+        GameConfig::GetInstance().Save();
         return true;
     }
     else if (strCommand.compare(L"$details on") == 0)
