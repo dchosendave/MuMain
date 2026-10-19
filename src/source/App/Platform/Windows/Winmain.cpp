@@ -2101,6 +2101,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int nC
 
     // Load game settings from INI file first
     GameConfig::GetInstance().Load();
+    SetShowFpsCounter(GameConfig::GetInstance().GetShowFpsCounter());
 
     // The animation task pool is off unless config.ini or the command line turns it on.
     if (GameConfig::GetInstance().GetEnableAnimationTaskPool() || wcsstr(GetCommandLineW(), L"--enable-taskpool"))

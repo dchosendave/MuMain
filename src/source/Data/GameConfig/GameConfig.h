@@ -174,6 +174,9 @@ public:
         return m_texturePack;
     }
     void SetTexturePack(const std::wstring& pack);
+    // The FPS readout in the corner, shown by default.
+    bool GetShowFpsCounter() const { return m_showFpsCounter; }
+    void SetShowFpsCounter(bool shown);
 
     // GPU backend override -- "default"/"vulkan"/"direct3d12"/"metal". Manual config.ini edit
     // only, same as GetSortParticleDraws() above: no setter, no in-game options-window exposure.
@@ -241,6 +244,7 @@ private:
     bool m_disableBodyShadows;
     int m_fpsCap;
     std::wstring m_texturePack;
+    bool m_showFpsCounter;
 
     int ReadInt(const wchar_t* section, const wchar_t* key, int defaultValue) const;
     void WriteInt(const wchar_t* section, const wchar_t* key, int value);

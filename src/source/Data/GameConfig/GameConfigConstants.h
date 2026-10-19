@@ -89,6 +89,9 @@ namespace CfgKeys
     // Active texture pack, a folder in Data/TexturePacks; empty = the original textures. Read once
     // at startup -- see Render::Textures::TexturePack.
     inline constexpr wchar_t CfgKeyTexturePack[] = L"TexturePack";
+    // The small FPS readout in the corner (SceneManager's SetShowFpsCounter; options window,
+    // `$fpscounter on|off`).
+    inline constexpr wchar_t CfgKeyShowFpsCounter[] = L"ShowFpsCounter";
 }
 
 namespace CfgDefaults
@@ -161,6 +164,7 @@ namespace CfgDefaults
     inline constexpr bool CfgDefaultDisableBodyShadows = false;
     inline constexpr int CfgDefaultFpsCap = -1;  // Uncapped
     inline constexpr wchar_t CfgDefaultTexturePack[] = L""; // The original textures
+    inline constexpr bool CfgDefaultShowFpsCounter = true;
 
     // "default" = this app's own platform-aware pick (prefers Vulkan on Windows to avoid
     // D3D12's vsync-cap bug; SDL's own auto-pick elsewhere). Other accepted values:

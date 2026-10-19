@@ -1321,10 +1321,12 @@ void mu::ui::window::COptionWindow::RmlTexturePackChanged(int index)
 
 void mu::ui::window::COptionWindow::RmlToggleShowFpsCounter()
 {
-    // No member/persistence -- SetShowFpsCounter() also clears ShowDebugInfo internally
-    // (mutually exclusive), and SyncRmlModel() reads both live every frame, so the other
-    // checkbox reflects the change on its own without any extra bookkeeping here.
+    // SetShowFpsCounter() also clears ShowDebugInfo internally (mutually exclusive), and
+    // SyncRmlModel() reads both live every frame, so the other checkbox reflects the change on
+    // its own. The counter's own state persists (config.ini, shown by default).
     SetShowFpsCounter(!GetShowFpsCounter());
+    GameConfig::GetInstance().SetShowFpsCounter(GetShowFpsCounter());
+    GameConfig::GetInstance().Save();
 }
 
 void mu::ui::window::COptionWindow::RmlToggleShowDebugInfo()
