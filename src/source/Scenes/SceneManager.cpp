@@ -735,6 +735,10 @@ static void UpdateDiagnostics()
     summary.history = std::span<const float>(s_frameTimesMs, static_cast<size_t>(s_frameCount));
     summary.oldestSample = s_frameCount < FRAME_HISTORY_SIZE ? 0 : s_frameIndex;
     UI::Diagnostics::Update(summary);
+
+    // From the next frame on; LogFrameTiming prints them for MU_RENDER_TIMING.
+    static const bool timingLog = std::getenv("MU_RENDER_TIMING") != nullptr;
+    FrameProfiler::g_TimingsShown = summary.details || summary.counters || summary.fpsOnly || timingLog;
 }
 
 /**

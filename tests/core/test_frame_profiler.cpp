@@ -46,6 +46,36 @@ TEST_CASE("renderer counters follow nested frame passes [core][profiling][frame_
     FrameProfiler::ResetCounters();
 }
 
+TEST_CASE("frame passes are tracked but not timed while nothing reads the timings [core][profiling][frame_profiler]")
+{
+    using Pass = FrameProfiler::Pass;
+    FrameProfiler::ResetFrame();
+    FrameProfiler::g_TimingsShown = false;
+    FrameProfiler::g_TimingsRecorded = false;
+    FrameProfiler::AccumulatorMs(Pass::Terrain) = -1.0f;
+
+    {
+        FRAME_PROFILE(Terrain);
+        CHECK(FrameProfiler::CurrentPass() == Pass::Terrain);
+    }
+
+    CHECK(FrameProfiler::CurrentPass() == Pass::Other);
+    CHECK(FrameProfiler::AccumulatorMs(Pass::Terrain) == -1.0f);
+
+    FrameProfiler::g_TimingsRecorded = true;
+    {
+        FRAME_PROFILE(Terrain);
+        const auto entered = std::chrono::steady_clock::now();
+        while (std::chrono::steady_clock::now() - entered < std::chrono::milliseconds(1))
+        {
+        }
+    }
+    CHECK(FrameProfiler::AccumulatorMs(Pass::Terrain) > -0.5f);
+
+    FrameProfiler::g_TimingsRecorded = false;
+    FrameProfiler::ResetFrame();
+}
+
 TEST_CASE("frame profile macro supports two scopes on one source line [core][profiling][frame_profiler]")
 {
     { FRAME_PROFILE(Terrain); } { FRAME_PROFILE(Objects); }

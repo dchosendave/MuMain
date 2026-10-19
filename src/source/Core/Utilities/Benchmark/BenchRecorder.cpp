@@ -157,6 +157,7 @@ bool Recorder::Start(const std::string& pattern, int repeats, int warmupFrames, 
     // user's back.
     m_countersWereEnabled = FrameProfiler::g_CountersEnabled;
     FrameProfiler::g_CountersEnabled = true;
+    FrameProfiler::g_TimingsRecorded = true;
     m_configBeforeRun = Scene::CaptureCurrentConfig();
     // Under vsync every segment is pinned to the display's refresh and they all look alike.
     MuSetVSyncForSession(false);
@@ -370,6 +371,7 @@ void Recorder::Finish(RunStatus status)
     m_environment.vsyncEffective = IsVSyncEnabled();
     Scene::ApplyConfig(m_configBeforeRun);
     FrameProfiler::g_CountersEnabled = m_countersWereEnabled;
+    FrameProfiler::g_TimingsRecorded = false;
     MuReapplyVSyncPreference();
 
     m_lastOutputPath.clear();
