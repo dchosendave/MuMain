@@ -38,6 +38,10 @@
 #define WEBGPU_UNIFORM_BINDING_SIZE 16384
 #define WEBGPU_UNIFORM_BLOCK_SIZE (1024 * 1024)
 #define WEBGPU_STAGING_CHUNK_SIZE (4 * 1024 * 1024)
+#define WEBGPU_STAGING_POOL_LIMIT 8
+// A fence of a command buffer without downloads only has to wait for the GPU once this much upload
+// data went out without a wait, so the queue cannot run arbitrarily far ahead (see SubmitInternal).
+#define WEBGPU_UNFENCED_UPLOAD_LIMIT (64ull * 1024 * 1024)
 #define WEBGPU_COPY_ROW_ALIGNMENT 256
 #define WEBGPU_MAX_LOGGED_ERRORS 64
 
@@ -162,10 +166,13 @@ typedef struct WebGPUUniformBlock
     WGPUBindGroup bindGroups[2][WEBGPU_MAX_UNIFORMS + 1]; // [stage][uniform count]
 } WebGPUUniformBlock;
 
+// Upload source data: filled on the CPU while recording, written to the GPU buffer with one queue
+// write at submit (like the uniform blocks), then reused. Queue operations run in order, so the next
+// command buffer's write cannot reach the buffer before this one's copies have read it.
 typedef struct WebGPUStagingChunk
 {
     WGPUBuffer buffer;
-    Uint8 *mapped;
+    Uint8 *cpu;
     Uint32 size;
     Uint32 used;
 } WebGPUStagingChunk;
@@ -211,6 +218,8 @@ typedef struct WebGPUCommandBuffer
     Uint32 stagingCount;
     Uint32 stagingCapacity;
 
+    bool hasDownloads; // its fence has to wait for the GPU: the downloads are read after it
+
     WebGPUWindowData *presentWindows[4]; // windows whose back buffer is copied to the canvas at submit
     Uint32 presentWindowCount;
 
@@ -254,6 +263,12 @@ struct WebGPURenderer
     WebGPUUniformBlock **freeBlocks;
     Uint32 freeBlockCount;
     Uint32 freeBlockCapacity;
+
+    WebGPUStagingChunk *freeStaging; // standard size chunks, ready for the next command buffer
+    Uint32 freeStagingCount;
+    Uint32 freeStagingCapacity;
+    // Upload bytes submitted since the last fence that really waited for the GPU.
+    Uint64 unfencedUploadBytes;
 
     WebGPUWindowData **windows;
     Uint32 windowCount;
@@ -364,6 +379,17 @@ static WebGPUFence *WebGPU_SignalWhenIdle(WebGPURenderer *renderer)
     info.callback = WebGPU_OnWorkDone;
     info.userdata1 = fence;
     wgpuQueueOnSubmittedWorkDone(renderer->queue, info);
+    return fence;
+}
+
+// A fence that is already signaled: nothing the application can observe depends on the GPU having
+// finished (upload data is copied out of transfer buffers while recording, and WebGPU keeps released
+// objects alive for work in flight). Waiting for real costs a trip through the browser's event loop.
+static WebGPUFence *WebGPU_SignaledFence(void)
+{
+    WebGPUFence *fence = (WebGPUFence *)SDL_calloc(1, sizeof(WebGPUFence));
+    SDL_SetAtomicInt(&fence->signaled, 1);
+    SDL_SetAtomicInt(&fence->references, 1);
     return fence;
 }
 
@@ -832,6 +858,8 @@ static void WebGPU_DiscardDownloads(WebGPUTransferBuffer *buffer)
 {
     Uint32 i;
     for (i = 0; i < buffer->downloadCount; i++) {
+        // Destroyed, not only released: the readback memory goes now instead of on garbage collection.
+        wgpuBufferDestroy(buffer->downloads[i].readback);
         wgpuBufferRelease(buffer->downloads[i].readback);
     }
     buffer->downloadCount = 0;
@@ -1508,16 +1536,17 @@ static SDL_GPUCommandBuffer *WEBGPU_AcquireCommandBuffer(SDL_GPURenderer *driver
     return (SDL_GPUCommandBuffer *)cb;
 }
 
+static void WebGPU_RecycleStagingChunk(WebGPURenderer *renderer, WebGPUStagingChunk *chunk);
+
 static void WebGPU_FreeCommandBuffer(WebGPUCommandBuffer *cb, bool submitted)
 {
     WebGPURenderer *renderer = cb->renderer;
     Uint32 i;
 
+    // A cancelled command buffer never wrote its chunks, so they are as reusable as submitted ones.
+    (void)submitted;
     for (i = 0; i < cb->stagingCount; i++) {
-        if (!submitted && cb->staging[i].mapped) {
-            wgpuBufferUnmap(cb->staging[i].buffer);
-        }
-        wgpuBufferRelease(cb->staging[i].buffer);
+        WebGPU_RecycleStagingChunk(renderer, &cb->staging[i]);
     }
     SDL_free(cb->staging);
 
@@ -1558,9 +1587,10 @@ static bool WebGPU_SubmitInternal(WebGPUCommandBuffer *cb, WebGPUFence **fenceOu
         }
     }
     for (i = 0; i < cb->stagingCount; i++) {
-        if (cb->staging[i].mapped) {
-            wgpuBufferUnmap(cb->staging[i].buffer);
-            cb->staging[i].mapped = NULL;
+        WebGPUStagingChunk *chunk = &cb->staging[i];
+        if (chunk->used > 0) {
+            wgpuQueueWriteBuffer(renderer->queue, chunk->buffer, 0, chunk->cpu, chunk->used);
+            renderer->unfencedUploadBytes += chunk->used;
         }
     }
 
@@ -1578,8 +1608,16 @@ static bool WebGPU_SubmitInternal(WebGPUCommandBuffer *cb, WebGPUFence **fenceOu
         }
     }
 
+    // Only downloads need the GPU to finish (see WebGPU_SignaledFence). A real wait now and then
+    // still keeps the client, which uploads every texture with its own fence while loading, from
+    // queueing unbounded upload data.
     if (fenceOut) {
-        *fenceOut = WebGPU_SignalWhenIdle(renderer);
+        if (cb->hasDownloads || renderer->unfencedUploadBytes >= WEBGPU_UNFENCED_UPLOAD_LIMIT) {
+            *fenceOut = WebGPU_SignalWhenIdle(renderer);
+            renderer->unfencedUploadBytes = 0;
+        } else {
+            *fenceOut = WebGPU_SignaledFence();
+        }
     }
     WebGPU_FreeCommandBuffer(cb, true);
     return true;
@@ -2068,29 +2106,66 @@ static void WEBGPU_EndComputePass(SDL_GPUCommandBuffer *commandBuffer) { (void)c
 static void WEBGPU_BeginCopyPass(SDL_GPUCommandBuffer *commandBuffer) { (void)commandBuffer; }
 static void WEBGPU_EndCopyPass(SDL_GPUCommandBuffer *commandBuffer) { (void)commandBuffer; }
 
-// Space in a staging buffer that is copied from in this command buffer.
+static void WebGPU_DestroyStagingChunk(WebGPUStagingChunk *chunk)
+{
+    wgpuBufferDestroy(chunk->buffer);
+    wgpuBufferRelease(chunk->buffer);
+    SDL_free(chunk->cpu);
+}
+
+// A standard chunk from the pool, or a new one (one of exactly `size` bytes when more is needed).
+static bool WebGPU_AcquireStagingChunk(WebGPURenderer *renderer, Uint32 size, WebGPUStagingChunk *chunk)
+{
+    WGPUBufferDescriptor desc = WGPU_BUFFER_DESCRIPTOR_INIT;
+    if (size <= WEBGPU_STAGING_CHUNK_SIZE && renderer->freeStagingCount > 0) {
+        *chunk = renderer->freeStaging[--renderer->freeStagingCount];
+        chunk->used = 0;
+        return true;
+    }
+    chunk->size = SDL_max(size, (Uint32)WEBGPU_STAGING_CHUNK_SIZE);
+    chunk->used = 0;
+    chunk->cpu = (Uint8 *)SDL_malloc(chunk->size);
+    if (!chunk->cpu) {
+        return false;
+    }
+    desc.size = chunk->size;
+    desc.usage = WGPUBufferUsage_CopySrc | WGPUBufferUsage_CopyDst;
+    chunk->buffer = wgpuDeviceCreateBuffer(renderer->device, &desc);
+    return true;
+}
+
+// Done with a chunk: its queue write and the copies from it are already submitted.
+static void WebGPU_RecycleStagingChunk(WebGPURenderer *renderer, WebGPUStagingChunk *chunk)
+{
+    if (chunk->size != WEBGPU_STAGING_CHUNK_SIZE || renderer->freeStagingCount >= WEBGPU_STAGING_POOL_LIMIT) {
+        WebGPU_DestroyStagingChunk(chunk);
+        return;
+    }
+    EXPAND_ARRAY_IF_NEEDED(renderer->freeStaging, WebGPUStagingChunk, renderer->freeStagingCount + 1, renderer->freeStagingCapacity, renderer->freeStagingCapacity * 2 + 4);
+    renderer->freeStaging[renderer->freeStagingCount++] = *chunk;
+}
+
+// Space in a staging buffer that is copied from in this command buffer; NULL when out of memory.
 static Uint8 *WebGPU_AllocateStaging(WebGPUCommandBuffer *cb, Uint32 size, WGPUBuffer *bufferOut, Uint32 *offsetOut)
 {
     WebGPUStagingChunk *chunk = cb->stagingCount > 0 ? &cb->staging[cb->stagingCount - 1] : NULL;
     const Uint32 alignedSize = WebGPU_Align(size, 16);
 
     if (!chunk || chunk->used + alignedSize > chunk->size) {
-        WGPUBufferDescriptor desc = WGPU_BUFFER_DESCRIPTOR_INIT;
+        WebGPUStagingChunk fresh;
+        if (!WebGPU_AcquireStagingChunk(cb->renderer, alignedSize, &fresh)) {
+            SDL_LogError(SDL_LOG_CATEGORY_GPU, "WebGPU: out of memory for %u bytes of upload data", (unsigned)size);
+            return NULL;
+        }
         EXPAND_ARRAY_IF_NEEDED(cb->staging, WebGPUStagingChunk, cb->stagingCount + 1, cb->stagingCapacity, cb->stagingCapacity * 2 + 4);
         chunk = &cb->staging[cb->stagingCount++];
-        chunk->size = SDL_max(alignedSize, (Uint32)WEBGPU_STAGING_CHUNK_SIZE);
-        chunk->used = 0;
-        desc.size = chunk->size;
-        desc.usage = WGPUBufferUsage_CopySrc | WGPUBufferUsage_MapWrite;
-        desc.mappedAtCreation = true;
-        chunk->buffer = wgpuDeviceCreateBuffer(cb->renderer->device, &desc);
-        chunk->mapped = (Uint8 *)wgpuBufferGetMappedRange(chunk->buffer, 0, chunk->size);
+        *chunk = fresh;
     }
 
     *bufferOut = chunk->buffer;
     *offsetOut = chunk->used;
     chunk->used += alignedSize;
-    return chunk->mapped + *offsetOut;
+    return chunk->cpu + *offsetOut;
 }
 
 static void WebGPU_TextureCopyGeometry(const WebGPUTexture *texture, Uint32 w, Uint32 h, Uint32 *blockRows, Uint32 *rowBytesForWidth)
@@ -2124,6 +2199,9 @@ static void WEBGPU_UploadToTexture(SDL_GPUCommandBuffer *commandBuffer, const SD
     stagingPitch = WebGPU_Align(tightPitch, WEBGPU_COPY_ROW_ALIGNMENT);
 
     staging = WebGPU_AllocateStaging(cb, stagingPitch * blockRows * depth, &stagingBuffer, &stagingOffset);
+    if (!staging) {
+        return;
+    }
     for (layer = 0; layer < depth; layer++) {
         for (row = 0; row < blockRows; row++) {
             const Uint64 from = source->offset + ((Uint64)layer * sourceRows + row) * sourcePitch;
@@ -2165,6 +2243,9 @@ static void WEBGPU_UploadToBuffer(SDL_GPUCommandBuffer *commandBuffer, const SDL
         return;
     }
     staging = WebGPU_AllocateStaging(cb, size, &stagingBuffer, &stagingOffset);
+    if (!staging) {
+        return;
+    }
     SDL_memcpy(staging, transfer->data + source->offset, SDL_min(destination->size, transfer->size - source->offset));
     wgpuCommandEncoderCopyBufferToBuffer(cb->encoder, stagingBuffer, stagingOffset, buffer->buffer, destination->offset, size);
 }
@@ -2253,6 +2334,7 @@ static void WEBGPU_DownloadFromTexture(SDL_GPUCommandBuffer *commandBuffer, cons
     extent.depthOrArrayLayers = download.layers;
     wgpuCommandEncoderCopyTextureToBuffer(cb->encoder, &src, &dst, &extent);
     WebGPU_AddDownload(transfer, &download);
+    cb->hasDownloads = true;
 }
 
 static void WEBGPU_DownloadFromBuffer(SDL_GPUCommandBuffer *commandBuffer, const SDL_GPUBufferRegion *source, const SDL_GPUTransferBufferLocation *destination)
@@ -2277,6 +2359,7 @@ static void WEBGPU_DownloadFromBuffer(SDL_GPUCommandBuffer *commandBuffer, const
     download.layers = 1;
     wgpuCommandEncoderCopyBufferToBuffer(cb->encoder, ((WebGPUBuffer *)source->buffer)->buffer, source->offset, download.readback, 0, size);
     WebGPU_AddDownload(transfer, &download);
+    cb->hasDownloads = true;
 }
 
 static void WEBGPU_Blit(SDL_GPUCommandBuffer *commandBuffer, const SDL_GPUBlitInfo *info)
@@ -2701,6 +2784,11 @@ static void WEBGPU_DestroyDevice(SDL_GPUDevice *device)
         SDL_free(block);
     }
     SDL_free(renderer->freeBlocks);
+
+    for (i = 0; i < renderer->freeStagingCount; i++) {
+        WebGPU_DestroyStagingChunk(&renderer->freeStaging[i]);
+    }
+    SDL_free(renderer->freeStaging);
 
     for (stage = 0; stage < 2; stage++) {
         for (i = 0; i <= WEBGPU_MAX_UNIFORMS; i++) {
