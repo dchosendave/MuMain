@@ -117,6 +117,16 @@ inline constexpr const char* kCounterNames[static_cast<int>(Counter::Count_)] = 
 static_assert(kCounterNames[static_cast<int>(Counter::Count_) - 1] != nullptr, "a counter without a name");
 
 inline bool g_CountersEnabled = false;
+// Pass timings read the clock twice per scope, thousands of times a frame (on the web each read is a
+// call into JavaScript), so they are only taken while an overlay or a log shows them, or a benchmark
+// records them. The passes themselves are always tracked: CurrentPass() is used outside profiling.
+inline bool g_TimingsShown = false;
+inline bool g_TimingsRecorded = false;
+
+inline bool TimingsEnabled()
+{
+    return g_TimingsShown || g_TimingsRecorded;
+}
 
 inline float& AccumulatorMs(Pass pass)
 {
@@ -275,15 +285,22 @@ class Scope
 {
 public:
     explicit Scope(Pass pass)
-        : m_pass(pass), m_startedAt(std::chrono::steady_clock::now())
+        : m_pass(pass), m_timed(TimingsEnabled())
     {
+        if (m_timed)
+        {
+            m_startedAt = std::chrono::steady_clock::now();
+        }
         PushPass(pass);
     }
 
     ~Scope()
     {
-        const auto elapsed = std::chrono::steady_clock::now() - m_startedAt;
-        AccumulatorMs(m_pass) += std::chrono::duration<float, std::milli>(elapsed).count();
+        if (m_timed)
+        {
+            const auto elapsed = std::chrono::steady_clock::now() - m_startedAt;
+            AccumulatorMs(m_pass) += std::chrono::duration<float, std::milli>(elapsed).count();
+        }
         PopPass();
     }
 
@@ -292,6 +309,7 @@ public:
 
 private:
     Pass m_pass;
+    bool m_timed;
     std::chrono::steady_clock::time_point m_startedAt;
 };
 }
