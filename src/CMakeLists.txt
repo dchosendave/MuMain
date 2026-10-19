@@ -458,7 +458,7 @@ if(EMSCRIPTEN)
     # Not -sGROWABLE_ARRAYBUFFERS, which the linker suggests: WebGPU rejects views of a resizable
     # buffer ("The provided ArrayBuffer value must not be resizable" in setBindGroup).
     "-sALLOW_MEMORY_GROWTH=1"
-    "-sINITIAL_MEMORY=512MB"
+    "-sINITIAL_MEMORY=128MB"
     "-sMAXIMUM_MEMORY=4GB"
     "-sSTACK_SIZE=8MB"
     "-sPTHREAD_POOL_SIZE=8"
