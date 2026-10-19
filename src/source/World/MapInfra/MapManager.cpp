@@ -1,6 +1,10 @@
 ﻿
 #include "stdafx.h"
 #include "World/MapInfra/MapManager.h"
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 #include "Camera/CameraMove.h"
 #include "GameLogic/Events/Cinematic/CDirection.h"
 #include "Audio/DSPlaySound.h"
@@ -1173,12 +1177,31 @@ void CMapManager::Load() // OK
     }
 }
 
+#ifdef __EMSCRIPTEN__
+// Web build: the page streams the game data (MuWeb loader.js). Fetching a map's terrain and object
+// packs in parallel up front is much faster than letting each file load on first use.
+EM_ASYNC_JS(void, mu_web_prefetch_world, (int folderIndex), {
+    if (typeof muPrefetchGroup === 'function') {
+        try {
+            await muPrefetchGroup('world:' + folderIndex);
+        } catch (e) {
+            console.error('prefetch of world ' + folderIndex + ' failed: ' + e);
+        }
+    }
+});
+#endif
+
 void CMapManager::LoadWorld(int Map)
 {
     if (Map == 32 && this->WorldActive == 32)
     {
         Map = this->WorldActive = 9;
     }
+
+#ifdef __EMSCRIPTEN__
+    // Data/WorldN and Data/ObjectN hold map N - 1.
+    mu_web_prefetch_world(Map + 1);
+#endif
 
     this->DeleteObjects();
     DeleteNpcs();

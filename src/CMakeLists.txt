@@ -40,6 +40,15 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 endif()
 
 add_subdirectory(ThirdParty/SDL EXCLUDE_FROM_ALL)
+
+# Web build: SDL has no WebGPU GPU driver. web/sdl_gpu_webgpu provides one through SDL's
+# private-driver hook (SDL_GPU_PRIVATE adds PrivateGPUDriver to SDL_gpu.c's backend list), so SDL
+# itself is unchanged. emdawnwebgpu supplies <webgpu/webgpu.h> on top of the browser's WebGPU.
+if(EMSCRIPTEN)
+  target_sources(SDL3-static PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/web/sdl_gpu_webgpu/SDL_gpu_webgpu.c")
+  target_compile_definitions(SDL3-static PRIVATE SDL_GPU_PRIVATE=1)
+  target_compile_options(SDL3-static PRIVATE "--use-port=emdawnwebgpu")
+endif()
 set(_saved_BUILD_SHARED_LIBS "${BUILD_SHARED_LIBS}")
 set(BUILD_SHARED_LIBS OFF)
 FetchContent_MakeAvailable(SDL3_ttf)
@@ -202,9 +211,34 @@ list(FILTER MU_CLIENT_SOURCES EXCLUDE REGEX "[/\\]Render[/\\](Core|RHI|Shaders)[
 # GL2/GL3/Vulkan renderer backends and a SystemInterface_SDL class this project doesn't
 # need -- see RmlUiSystemInterface). Not picked up by the GLOB_RECURSE above since it globs
 # "source/*.cpp", not ThirdParty/.
+set(MU_RMLUI_SDL_GPU_RENDERER "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/RmlUi/Backends/RmlUi_Renderer_SDL_GPU.cpp")
+if(EMSCRIPTEN)
+  # Web build: RmlUi's renderer embeds SPIR-V/DXIL/MSL only. Compile a copy that asks
+  # web/rmlui/RmlUiWgslShaders.cpp for WGSL when the device takes SDL's "private" format
+  # (the WebGPU driver), instead of patching the RmlUi submodule.
+  file(READ "${MU_RMLUI_SDL_GPU_RENDERER}" _rmlui_renderer)
+  set(_rmlui_invalid_format "\telse\n\t{\n\t\tRMLUI_ERRORMSG(\"Invalid shader format\");")
+  string(FIND "${_rmlui_renderer}" "${_rmlui_invalid_format}" _rmlui_anchor)
+  string(FIND "${_rmlui_renderer}" "enum ShaderFormat {" _rmlui_decl_anchor)
+  if(_rmlui_anchor EQUAL -1 OR _rmlui_decl_anchor EQUAL -1)
+    message(FATAL_ERROR "RmlUi_Renderer_SDL_GPU.cpp changed; update the WGSL hook in src/CMakeLists.txt")
+  endif()
+  string(REPLACE "${_rmlui_invalid_format}"
+    "\telse if (sdl_shader_format & SDL_GPU_SHADERFORMAT_PRIVATE)\n\t{\n\t\treturn MuWebCreateRmlUiShader(device, shader.id, shader.stage, shader.samplers, shader.uniforms);\n\t}\n${_rmlui_invalid_format}"
+    _rmlui_renderer "${_rmlui_renderer}")
+  string(REPLACE "enum ShaderFormat {"
+    "SDL_GPUShader* MuWebCreateRmlUiShader(SDL_GPUDevice* device, int id, SDL_GPUShaderStage stage, int samplers, int uniforms);\n\nenum ShaderFormat {"
+    _rmlui_renderer "${_rmlui_renderer}")
+  set(MU_RMLUI_SDL_GPU_RENDERER "${CMAKE_CURRENT_BINARY_DIR}/generated/RmlUi_Renderer_SDL_GPU.web.cpp")
+  # Written through a temporary file so the copy is only touched when its content changes.
+  file(WRITE "${MU_RMLUI_SDL_GPU_RENDERER}.tmp" "${_rmlui_renderer}")
+  configure_file("${MU_RMLUI_SDL_GPU_RENDERER}.tmp" "${MU_RMLUI_SDL_GPU_RENDERER}" COPYONLY)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/RmlUi/Backends/RmlUi_Renderer_SDL_GPU.cpp")
+  list(APPEND MU_CLIENT_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/web/rmlui/RmlUiWgslShaders.cpp")
+endif()
 list(APPEND MU_CLIENT_SOURCES
   "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/RmlUi/Backends/RmlUi_Platform_SDL.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/RmlUi/Backends/RmlUi_Renderer_SDL_GPU.cpp"
+  "${MU_RMLUI_SDL_GPU_RENDERER}"
 )
 
 # The control socket and its local-socket transport exist only in developer
@@ -414,6 +448,7 @@ if(EMSCRIPTEN)
   # blocking game loop can yield to the browser (emscripten_sleep in MainLoop), and a
   # thread pool for the client's worker threads (needs the COOP/COEP headers of MuWeb.Gateway).
   target_link_options(Main PRIVATE
+    "--use-port=emdawnwebgpu"
     "-lwebsocket.js"
     "-sALLOW_MEMORY_GROWTH=1"
     "-sINITIAL_MEMORY=512MB"
