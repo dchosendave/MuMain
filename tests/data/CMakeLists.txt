@@ -3,11 +3,14 @@ mu_add_test(
     SOURCES
         test_item_database.cpp
         test_item_json.cpp
+        test_item_list_model.cpp
         test_item_model_json.cpp
         test_item_model_display_json.cpp
         test_item_model_glow_json.cpp
         test_item_model_material_json.cpp
         test_item_model_problems.cpp
+        test_item_names.cpp
+        test_item_stats_json.cpp
         test_localized_string.cpp
     LINK_LIBS
         MuClient
@@ -54,6 +57,19 @@ mu_add_test(
         MuClient
 )
 target_compile_definitions(test_item_database_files PRIVATE
+    MU_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/src/bin/Data"
+)
+
+# Animates the shipped player model the way the character pre-pass does.
+mu_add_test(
+    NAME test_character_bones
+    SOURCES
+        test_character_bones.cpp
+        ${CMAKE_SOURCE_DIR}/src/source/App/Platform/Windows/Winmain.cpp
+    LINK_LIBS
+        MuClient
+)
+target_compile_definitions(test_character_bones PRIVATE
     MU_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/src/bin/Data"
 )
 
