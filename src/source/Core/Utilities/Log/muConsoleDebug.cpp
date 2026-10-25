@@ -36,6 +36,7 @@
 #include "UI/Theme/ThemeSelection.h"
 #include "UI/Windows/RememberPasswordPrompt.h"
 #include "Core/Utilities/StringUtils.h"
+#include "Engine/Object/ClassicSwing.h"
 
 #ifdef _EDITOR
 #include "../MuEditor/UI/Console/MuEditorConsoleUI.h"
@@ -346,7 +347,17 @@ bool CmuConsoleDebug::CheckCommand(const std::wstring& strCommand)
         return true;
     }
 #endif
-    if (strCommand.compare(L"$fpscounter on") == 0)
+    if (strCommand.compare(L"$classicswing on") == 0)
+    {
+        Engine::Object::g_ClassicSwingEnabled = true;
+        return true;
+    }
+    else if (strCommand.compare(L"$classicswing off") == 0)
+    {
+        Engine::Object::g_ClassicSwingEnabled = false;
+        return true;
+    }
+    else if (strCommand.compare(L"$fpscounter on") == 0)
     {
         SetShowFpsCounter(true);
         return true;

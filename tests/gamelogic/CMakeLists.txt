@@ -64,3 +64,19 @@ mu_add_test(
     LINK_LIBS
         MuClient
 )
+
+mu_add_test(
+    NAME test_skill_input_queue
+    SOURCES
+        test_skill_input_queue.cpp
+    LINK_LIBS
+        MuClient
+)
+
+mu_add_test(
+    NAME test_classic_swing
+    SOURCES
+        test_classic_swing.cpp
+    LINK_LIBS
+        MuClient
+)

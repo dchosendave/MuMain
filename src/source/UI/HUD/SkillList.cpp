@@ -14,6 +14,8 @@
 #include "Engine/Object/ZzzCharacter.h"
 #include "Engine/Object/ZzzInterface.h"
 #include "Engine/Object/ZzzInventory.h"
+#include "Engine/Object/PlayerActionState.h"
+#include "GameLogic/Combat/SkillInputQueue.h"
 
 #include "GameLogic/Items/CSItemOption.h"
 #include "GameLogic/Events/CSChaosCastle.h"
@@ -291,6 +293,17 @@ void mu::ui::window::CSkillList::UseHotKey(int iHotKey)
         m_wHeroPriorSkill = CharacterAttribute->Skill[Hero->CurrentSkill];
 
         Hero->CurrentSkill = m_iHotKeySkillType[iHotKey];
+
+        // Pressed mid-swing: cast it after the swing, in press order (see SkillInputQueue).
+        if (Engine::Object::IsSwingAction(Hero->Object.CurrentAction)
+            && (Hero->CurrentSkill < AT_PET_COMMAND_DEFAULT || Hero->CurrentSkill >= AT_PET_COMMAND_END))
+        {
+            GameLogic::Combat::g_HeroSkillInputQueue.Push(Hero->CurrentSkill, GetTickCount());
+        }
+        else
+        {
+            GameLogic::Combat::g_HeroSkillInputQueue.Clear();
+        }
 
         auto bySkill = CharacterAttribute->Skill[Hero->CurrentSkill];
 
