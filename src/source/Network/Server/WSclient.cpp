@@ -37,6 +37,7 @@
 #include "Render/Textures/ZzzOpenglUtil.h"
 #include "Engine/Object/ZzzOpenData.h"
 #include "Engine/Object/PlayerActionState.h"
+#include "Engine/Object/ClassicSwing.h"
 #include "Scenes/SceneCore.h"
 #include "Network/Reconnect/ReconnectManager.h"
 #include "Network/IncomingPacketQueue.h"
@@ -8490,6 +8491,9 @@ void ReceiveServerCommand(const BYTE* ReceiveBuffer)
         break;
     case 61:
         g_PortalMgr.ResetPortalPosition();
+        break;
+    case Engine::Object::kClassicSwingServerCommand:
+        Engine::Object::g_ClassicSwingEnabled = Data->Cmd2 != 0;
         break;
     }
 }
