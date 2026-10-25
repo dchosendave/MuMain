@@ -64,3 +64,11 @@ mu_add_test(
     LINK_LIBS
         MuClient
 )
+
+mu_add_test(
+    NAME test_attack_speed_curve
+    SOURCES
+        test_attack_speed_curve.cpp
+    LINK_LIBS
+        MuClient
+)

@@ -25,6 +25,7 @@
 #include "Engine/Object/ZzzCharacter.h"
 #include "Engine/Object/AnimationTaskPool.h"
 #include "Engine/Object/PlayerActionState.h"
+#include "Engine/Object/AttackSpeedCurve.h"
 #include "Render/Terrain/ZzzLodTerrain.h"
 #include "Render/Textures/ZzzTexture.h"
 #include "Engine/AI/ZzzAI.h"
@@ -806,106 +807,11 @@ void SetPlayerWalk(CHARACTER* c)
 extern int CurrentSkill;
 int AttackHand = 0;
 
-#define RGZ_FIX_ATTACK_SPEED
-
 void SetAttackSpeed()
 {
-#ifndef RGZ_FIX_ATTACK_SPEED
-    float AttackSpeed1 = CharacterAttribute->AttackSpeed * 0.004f;
-    float MagicSpeed1 = CharacterAttribute->MagicSpeed * 0.004f;
-    float MagicSpeed2 = CharacterAttribute->MagicSpeed * 0.002f;
-#else
-    float AttackSpeed1 = CharacterAttribute->AttackSpeed;
-    float MagicSpeed1 = CharacterAttribute->MagicSpeed;
-    float MagicSpeed2 = CharacterAttribute->MagicSpeed;
-
-    if (CharacterAttribute->AttackSpeed >= 509 && CharacterAttribute->AttackSpeed <= 549)
-    {
-        AttackSpeed1 = AttackSpeed1 * 0.0026000f;
-    }
-    else if (CharacterAttribute->AttackSpeed >= 550 && CharacterAttribute->AttackSpeed <= 750)
-    {
-        AttackSpeed1 = AttackSpeed1 * 0.0017000f;
-    }
-    else
-    {
-        AttackSpeed1 = AttackSpeed1 * 0.0040000f;
-    }
-
-    if (CharacterAttribute->MagicSpeed >= 509 && CharacterAttribute->MagicSpeed <= 549)
-    {
-        MagicSpeed1 = MagicSpeed1 * 0.0026000f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 550 && CharacterAttribute->MagicSpeed <= 750)
-    {
-        MagicSpeed1 = MagicSpeed1 * 0.0017000f;
-    }
-    else
-    {
-        MagicSpeed1 = MagicSpeed1 * 0.0040000f;
-    }
-
-    if (CharacterAttribute->MagicSpeed >= 455 && CharacterAttribute->MagicSpeed <= 479)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0024700f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 605 && CharacterAttribute->MagicSpeed <= 636)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0019000f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 637 && CharacterAttribute->MagicSpeed <= 668)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0018000f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 669 && CharacterAttribute->MagicSpeed <= 688)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0017000f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 855 && CharacterAttribute->MagicSpeed <= 1040)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0016300f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 1041 && CharacterAttribute->MagicSpeed <= 1104)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0015500f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 1301 && CharacterAttribute->MagicSpeed <= 1500)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0017500f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 1501 && CharacterAttribute->MagicSpeed <= 1524)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0015000f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 1525 && CharacterAttribute->MagicSpeed <= 1800)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0014500f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 1801 && CharacterAttribute->MagicSpeed <= 1999)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0013000f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 2000 && CharacterAttribute->MagicSpeed <= 2167)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0012500f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 2168 && CharacterAttribute->MagicSpeed <= 2354)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0011500f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 2855 && CharacterAttribute->MagicSpeed <= 3011)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0009000f;
-    }
-    else if (CharacterAttribute->MagicSpeed >= 3011)
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0008100f;
-    }
-    else
-    {
-        MagicSpeed2 = MagicSpeed2 * 0.0020000f;
-    }
-#endif
+    float AttackSpeed1 = Engine::Object::AttackSpeedAnimationBonus(CharacterAttribute->AttackSpeed, Engine::Object::kAttackSpeedSlope);
+    float MagicSpeed1 = Engine::Object::AttackSpeedAnimationBonus(CharacterAttribute->MagicSpeed, Engine::Object::kAttackSpeedSlope);
+    float MagicSpeed2 = Engine::Object::AttackSpeedAnimationBonus(CharacterAttribute->MagicSpeed, Engine::Object::kCastSpeedSlope);
 
     Models[MODEL_PLAYER].Actions[PLAYER_ATTACK_FIST].PlaySpeed = 0.6f + AttackSpeed1;
 
@@ -1012,7 +918,7 @@ void SetAttackSpeed()
     Models[MODEL_PLAYER].Actions[PLAYER_FENRIR_ATTACK_DARKLORD_TELEPORT].PlaySpeed = 0.3f;
     Models[MODEL_PLAYER].Actions[PLAYER_ATTACK_REMOVAL].PlaySpeed = 0.28f;
 
-    float RageAttackSpeed = CharacterAttribute->AttackSpeed * 0.002f;
+    float RageAttackSpeed = Engine::Object::AttackSpeedAnimationBonus(CharacterAttribute->AttackSpeed, Engine::Object::kCastSpeedSlope);
 
     Models[MODEL_PLAYER].Actions[PLAYER_SKILL_THRUST].PlaySpeed = 0.4f + RageAttackSpeed;
     Models[MODEL_PLAYER].Actions[PLAYER_SKILL_STAMP].PlaySpeed = 0.4f + RageAttackSpeed;
@@ -2735,7 +2641,7 @@ bool AttackStage(CHARACTER* c, OBJECT* o)
                     CreateEffect(BITMAP_SWORD_FORCE, o->Position, o->Angle, o->Light, 0, o, o->PKKey, FindHotKey(iSkill));
                 }
 
-                float AttackSpeed1 = CharacterAttribute->AttackSpeed * 0.004f;//
+                float AttackSpeed1 = Engine::Object::AttackSpeedAnimationBonus(CharacterAttribute->AttackSpeed, Engine::Object::kAttackSpeedSlope);
                 Models[MODEL_PLAYER].Actions[PLAYER_ATTACK_SKILL_WHEEL].PlaySpeed = 0.54f + AttackSpeed1;
                 c->AttackTime = 15;
             }
