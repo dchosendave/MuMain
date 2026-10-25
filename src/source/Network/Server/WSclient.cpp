@@ -36,6 +36,7 @@
 #include "Render/Effects/ZzzEffect.h"
 #include "Render/Textures/ZzzOpenglUtil.h"
 #include "Engine/Object/ZzzOpenData.h"
+#include "Engine/Object/PlayerActionState.h"
 #include "Scenes/SceneCore.h"
 #include "Network/Reconnect/ReconnectManager.h"
 #include "Network/IncomingPacketQueue.h"
@@ -2121,6 +2122,15 @@ void ReceiveMovePosition(const BYTE* ReceiveBuffer)
     c->Path.PathNum = 0;
     c->Path.CurrentPath = 0;
     c->Path.CurrentPathFloat = 0;
+
+    // The basic weapon skills (Cyclone, Lunge, Slash, ...) move the caster onto the target on
+    // every cast, and this packet arrives mid-swing. Stopping here cut the swing short and showed
+    // the stand pose between casts; let the swing finish while the character slides (JumpTime).
+    if (o->Type == MODEL_PLAYER && Engine::Object::IsSwingAction(o->CurrentAction))
+    {
+        return;
+    }
+
     SetPlayerStop(c);
 }
 
