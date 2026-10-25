@@ -23,6 +23,8 @@
 #include "GameLogic/Combat/ClassAttack.h"
 #include "GameLogic/Combat/SkillCast.h"
 #include "GameLogic/Combat/SkillExecution.h"
+#include "GameLogic/Combat/SkillInputQueue.h"
+#include "Engine/Object/ClassicSwing.h"
 #include "Core/Input/ImeInput.h"
 #include "Engine/Object/ZzzInventory.h"
 #include "Engine/Object/ZzzOpenData.h"
@@ -2657,7 +2659,23 @@ void Attack(CHARACTER* c)
         }
     }
 
+    // Classic swing rhythm (see ClassicSwing.h): a held attack re-decides its next cast 30 times per
+    // second, like a 30 FPS client, instead of once per rendered frame. A fresh click is handled at once.
+    if (Engine::Object::IsClassicSwingActive(CharacterAttribute->AttackSpeed)
+        && Engine::Object::g_HeroCastDecisionClock.Steps(GetMillisecondsTimestamp()) == 0
+        && !MouseRButtonPush)
+    {
+        return;
+    }
+
     bool Success = false;
+
+    // A skill pressed during the previous swing goes first, so combo presses keep their order.
+    const int queuedSkill = GameLogic::Combat::g_HeroSkillInputQueue.Peek(GetTickCount());
+    if (queuedSkill >= 0)
+    {
+        Hero->CurrentSkill = queuedSkill;
+    }
 
     auto Skill = CharacterAttribute->Skill[Hero->CurrentSkill];
     float Distance = gSkillManager.GetSkillDistance(Skill, c);
@@ -2748,7 +2766,14 @@ void Attack(CHARACTER* c)
         }
     }
 
+    const bool wasSwinging = Engine::Object::IsSwingAction(o->CurrentAction);
     GameLogic::Combat::ExecuteSkill(c, Skill, Distance);
+
+    // The queued skill counts as cast once its swing started; until then it stays next.
+    if (queuedSkill >= 0 && !wasSwinging && Engine::Object::IsSwingAction(o->CurrentAction))
+    {
+        GameLogic::Combat::g_HeroSkillInputQueue.Pop();
+    }
 }
 
 
@@ -2883,10 +2908,11 @@ void MoveEffect(OBJECT* o, int iIndex);
 namespace
 {
     // While the hero slides to a server-set position (the basic weapon skills reposition the
-    // hero on every cast), MoveHero would freeze all input until the slide ended, which capped
-    // those skills' auto-attack cadence below the player's attack speed (issue #350). Keep the
-    // auto-attack re-cast running through the slide; the slide still animates smoothly and only
-    // manual move/click input stays suppressed. Returns true when the hero is mid-slide, in
+    // hero on every cast, and push the target, so the hero follows it), MoveHero would freeze all
+    // input until the slide ended, which capped those skills' cadence below the player's attack
+    // speed (issue #350) and lost the target while chasing it. Keep re-casting through the slide,
+    // for auto-attack and for a held right mouse button; the slide still animates smoothly and
+    // only manual move/click input stays suppressed. Returns true when the hero is mid-slide, in
     // which case MoveHero should stop after this.
     bool HandleHeroPositionSlide(CHARACTER* c)
     {
@@ -2895,7 +2921,7 @@ namespace
             return false;
         }
 
-        if (g_pOption->IsAutoAttack() && Attacking != -1 && SelectedCharacter != -1)
+        if ((g_pOption->IsAutoAttack() && Attacking != -1 && SelectedCharacter != -1) || MouseRButton)
         {
             Attack(Hero);
         }

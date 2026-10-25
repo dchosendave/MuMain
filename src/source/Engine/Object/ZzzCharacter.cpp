@@ -26,6 +26,7 @@
 #include "Engine/Object/AnimationTaskPool.h"
 #include "Engine/Object/PlayerActionState.h"
 #include "Engine/Object/AttackSpeedCurve.h"
+#include "Engine/Object/ClassicSwing.h"
 #include "Render/Terrain/ZzzLodTerrain.h"
 #include "Render/Textures/ZzzTexture.h"
 #include "Engine/AI/ZzzAI.h"
@@ -2387,6 +2388,16 @@ bool CharacterAnimation(CHARACTER* c, OBJECT* o)
     if (g_isCharacterBuff(o, eDeBuff_Stun) || g_isCharacterBuff(o, eDeBuff_Sleep))
     {
         return false;
+    }
+
+    if (c == Hero)
+    {
+        // Read every frame, so the first step of a new swing doesn't count the time before it.
+        const int classicSteps = Engine::Object::g_HeroSwingAnimationClock.Steps(GetMillisecondsTimestamp());
+        if (Engine::Object::IsSwingAction(o->CurrentAction) && Engine::Object::IsClassicSwingActive(CharacterAttribute->AttackSpeed))
+        {
+            PlaySpeed = Engine::Object::ClassicSwingPlaySpeed(PlaySpeed, classicSteps, FPS_ANIMATION_FACTOR);
+        }
     }
 
     Play = b->PlayAnimation(&o->AnimationFrame, &o->PriorAnimationFrame, &o->PriorAction, PlaySpeed, o->Position, o->Angle);
