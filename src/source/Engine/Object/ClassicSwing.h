@@ -19,8 +19,13 @@ namespace Engine::Object
     constexpr int kClassicSwingMinimumAttackSpeed = 1000;
     constexpr int kClassicSwingMaximumStepsPerFrame = 2;
 
-    // Toggled with the chat command "$classicswing on|off".
+    // Set by the server with the server command below when the hero enters the world, and when
+    // the setting changes while playing. The chat command "$classicswing on|off" overrides it
+    // locally until the server sends it again.
     inline bool g_ClassicSwingEnabled = true;
+
+    // Server command type (0xF3 0x40) carrying the setting: parameter 1 is 1 for on, 0 for off.
+    constexpr int kClassicSwingServerCommand = 200;
 
     inline bool IsClassicSwingActive(int attackSpeed)
     {
