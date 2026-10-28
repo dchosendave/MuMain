@@ -38,6 +38,7 @@
 #include "UI/Events/CatapultWindow.h"
 #include "UI/Events/ChaosCastleTime.h"
 #include "UI/Events/BattleSoccerScore.h"
+#include "UI/Combat/CastleSiegeScoreboard.h"
 #include "UI/HUD/CommandWindow.h"
 #include "UI/Dialogs/WindowMenu.h"
 #include "UI/Options/OptionWindow.h"
@@ -182,6 +183,7 @@ namespace mu::ui::window
         CCatapultWindow* m_pNewCatapultWindow;
         CChaosCastleTime* m_pNewChaosCastleTime;
         CBattleSoccerScore* m_pNewBattleSoccerScore;
+        CCastleSiegeScoreboard* m_pCastleSiegeScoreboard;
         CCommandWindow* m_pNewCommandWindow;
         CMuHelperBar* m_pMuHelperBar;
         CWindowMenu* m_pNewWindowMenu;

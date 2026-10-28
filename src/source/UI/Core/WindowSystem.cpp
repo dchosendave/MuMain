@@ -78,6 +78,7 @@ CSystem::CSystem()
     m_pNewCatapultWindow = nullptr;
     m_pNewChaosCastleTime = nullptr;
     m_pNewBattleSoccerScore = nullptr;
+    m_pCastleSiegeScoreboard = nullptr;
     m_pNewCommandWindow = nullptr;
     m_pNewWindowMenu = nullptr;
     m_pNewOptionWindow = nullptr;
@@ -340,6 +341,10 @@ bool CSystem::LoadMainSceneInterface()
 
     m_pNewBattleSoccerScore = new CBattleSoccerScore;
     if (m_pNewBattleSoccerScore->Create(m_pNewUIMng) == false)
+        return false;
+
+    m_pCastleSiegeScoreboard = new CCastleSiegeScoreboard;
+    if (m_pCastleSiegeScoreboard->Create(m_pNewUIMng) == false)
         return false;
 
     m_pNewCommandWindow = new CCommandWindow;
@@ -611,6 +616,7 @@ bool CSystem::LoadMainSceneInterface()
     hudSlot(INTERFACE_BLOODCASTLE_TIME, "blood_castle_time", m_pNewBloodCastle, 124.f, 81.f);
     hudSlot(INTERFACE_CHAOSCASTLE_TIME, "chaos_castle_time", m_pNewChaosCastleTime, 124.f, 81.f);
     hudSlot(INTERFACE_BATTLE_SOCCER_SCORE, "battle_soccer", m_pNewBattleSoccerScore, 131.f, 70.f);
+    hudSlot(INTERFACE_CASTLE_SIEGE_SCOREBOARD, "castle_siege_scoreboard", m_pCastleSiegeScoreboard, 154.f, 148.f);
     hudSlot(INTERFACE_DUEL_WINDOW, "duel", m_pNewDuelWindow, 131.f, 70.f);
     hudSlot(INTERFACE_KANTURU_INFO, "kanturu_info", m_pNewKanturuInfoWindow, 99.f, 78.f);
     hudSlot(INTERFACE_EMPIREGUARDIAN_TIMER, "empire_guardian_timer", m_pNewEmpireGuardianTimer, 124.f, 81.f);
@@ -641,6 +647,7 @@ void CSystem::UnloadMainSceneInterface()
     SAFE_DELETE(m_pNewQuickCommandWindow);
     SAFE_DELETE(m_pNewWindowMenu);
     SAFE_DELETE(m_pNewBattleSoccerScore);
+    SAFE_DELETE(m_pCastleSiegeScoreboard);
     SAFE_DELETE(m_pNewCatapultWindow);
     SAFE_DELETE(m_pNewKanturu2ndEnterNpc);
     SAFE_DELETE(m_pNewKanturuInfoWindow);
@@ -1871,6 +1878,7 @@ bool CSystem::IsImpossibleHideInterface(DWORD dwKey)
         || dwKey == INTERFACE_BLOODCASTLE_TIME
         || dwKey == INTERFACE_CHAOSCASTLE_TIME
         || dwKey == INTERFACE_BATTLE_SOCCER_SCORE
+        || dwKey == INTERFACE_CASTLE_SIEGE_SCOREBOARD
         || dwKey == INTERFACE_DUEL_WINDOW
         || dwKey == INTERFACE_CRYWOLF
         || dwKey == INTERFACE_MU_HELPER_BAR

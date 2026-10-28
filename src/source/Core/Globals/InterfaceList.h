@@ -131,6 +131,9 @@ enum INTERFACE_LIST
     // a different button model (arbitrary labeled list vs two fixed OK/Cancel slots). Same
     // reasoning as INTERFACE_CREDITS above.
     INTERFACE_GENERIC_MENU_DIALOG,
+    // CCastleSiegeScoreboard (UI/Combat/CastleSiegeScoreboard.h) -- the point mode Castle Siege
+    // scoreboard. Same reasoning as INTERFACE_CREDITS above.
+    INTERFACE_CASTLE_SIEGE_SCOREBOARD,
     INTERFACE_END,
     INTERFACE_COUNT = INTERFACE_END - 2,
 };

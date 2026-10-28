@@ -1,0 +1,62 @@
+/* Legacy theme for CCastleSiegeScoreboard (see castle_siege_scoreboard.rml): a dark, half
+   transparent board with a thin bronze frame in the colours of the original siege HUD. New in this
+   client, so there is no original layout to reproduce. Reference px relative to the window's
+   top-left, under .screen's W/640 x H/480 stretch. */
+
+body { pointer-events: none; }
+
+.screen {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 640px;
+	height: 480px;
+	transform-origin: left top;
+	pointer-events: none;
+}
+
+/* The panel grows with its rows: up to eight guilds and the two footer lines. */
+#panel { position: absolute; width: 154px; padding: 6px 0 4px 0; font-family: "token(font-body)"; }
+
+/* Every text is placed at its reference point and drawn at the native size from there. */
+.title, .time, .rank, .name, .holder-mark, .points, .label, .value {
+	display: block;
+	position: absolute;
+	top: 0;
+	transform-origin: left top;
+	white-space: nowrap;
+}
+.time, .points, .value { transform-origin: right top; }
+
+.title-row { display: block; position: relative; width: 154px; height: 16px; }
+.title { left: 7px; font-weight: bold; }
+.time { right: 7px; font-weight: bold; }
+
+/* The guilds, best first, 12 units apart. */
+.lines { display: block; position: relative; width: 154px; }
+.line { display: block; position: relative; width: 154px; height: 12px; }
+.rank { left: 7px; }
+.name { left: 19px; }
+.holder-mark { left: 110px; }
+.points { right: 7px; font-weight: bold; }
+
+.footer { display: block; position: relative; width: 154px; margin-top: 4px; padding-top: 3px; border-top: 1px #ffffff20; }
+.footer-row { display: block; position: relative; width: 154px; height: 12px; }
+.label { left: 7px; }
+.value { right: 7px; }
+
+/* The HUD takes no pointer events where it is placed (base.rcss gives a placed panel them). */
+#panel.slot-placed { pointer-events: none; }
+
+#panel { background-color: #000000a0; border: 1px #8c6d3c; }
+.title { color: #ffcc66; }
+#panel.final .title { color: #ff8844; }
+.time { color: #ffffff; }
+.rank { color: #a0a0a0; }
+.name { color: #e6e6e6; }
+.line.holds .name { color: #ffcc66; }
+.line.own .name, .line.own .rank { color: #66ccff; }
+.holder-mark { color: #ffcc00; }
+.points { color: #ffffff; }
+.label { color: #a0a0a0; }
+.value { color: #e6e6e6; }

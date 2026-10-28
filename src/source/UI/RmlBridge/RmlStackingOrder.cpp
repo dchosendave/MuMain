@@ -53,6 +53,7 @@ constexpr DocumentPlacement Placements[] = {
     {"cursed_temple_system.rml", 1.5f, MainScene},
     {"siege_warfare.rml", 1.6f, MainScene},
     {"battle_soccer_score.rml", 1.8f, MainScene},
+    {"castle_siege_scoreboard.rml", 1.8f, MainScene},
     {"kanturu_info.rml", 1.92f, MainScene},
     {"quick_command.rml", 2.0f, MainScene},
     {"trade.rml", 2.1f, MainScene},

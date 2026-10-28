@@ -88,3 +88,11 @@ mu_add_test(
     LINK_LIBS
         MuClient
 )
+
+mu_add_test(
+    NAME test_castle_siege_scoreboard
+    SOURCES
+        test_castle_siege_scoreboard.cpp
+    LINK_LIBS
+        MuClient
+)

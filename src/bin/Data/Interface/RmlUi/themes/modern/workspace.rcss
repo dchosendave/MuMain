@@ -86,6 +86,8 @@ body {
 .event-hud .slot[data-window="chaos_castle_time"] { left: calc(513px * var(--hud-scale)); top: calc(348px * var(--hud-scale)); }
 .event-hud .slot[data-window="battle_soccer"],
 .event-hud .slot[data-window="duel"] { left: calc(509px * var(--hud-scale)); top: calc(359px * var(--hud-scale)); }
+/* Above the siege mini map (siege_warfare.rcss, #siege_hud at 486, 234). */
+.event-hud .slot[data-window="castle_siege_scoreboard"] { left: calc(486px * var(--hud-scale)); top: calc(80px * var(--hud-scale)); }
 .event-hud .slot[data-window="kanturu_info"] { left: calc(541px * var(--hud-scale)); top: calc(351px * var(--hud-scale)); }
 .event-hud .slot[data-window="empire_guardian_timer"] { left: calc(507px * var(--hud-scale)); top: calc(342px * var(--hud-scale)); }
 .event-hud .slot[data-window="doppelganger_frame"] { left: calc(413px * var(--hud-scale)); top: calc(342px * var(--hud-scale)); }

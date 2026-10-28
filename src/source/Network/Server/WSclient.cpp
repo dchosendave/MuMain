@@ -38,6 +38,7 @@
 #include "Engine/Object/ZzzOpenData.h"
 #include "Engine/Object/PlayerActionState.h"
 #include "Engine/Object/ClassicSwing.h"
+#include "GameLogic/Events/CastleSiegeScoreboard.h"
 #include "Scenes/SceneCore.h"
 #include "Network/Reconnect/ReconnectManager.h"
 #include "Network/IncomingPacketQueue.h"
@@ -14024,6 +14025,11 @@ static void ProcessPacket(const BYTE* ReceiveBuffer, int32_t Size)
     }
     break;
 #endif // ASG_ADD_GENS_SYSTEM
+    case GameLogic::CastleSiege::kScoreboardPacketCode:
+        // The point mode Castle Siege scoreboard (C2 FB 01); CCastleSiegeScoreboard shows it.
+        GameLogic::CastleSiege::g_Scoreboard.Apply(received_span, GetTickCount());
+        break;
+
     case 0xF9:
     {
         auto Data = (LPPHEADER_DEFAULT_SUBCODE)ReceiveBuffer;

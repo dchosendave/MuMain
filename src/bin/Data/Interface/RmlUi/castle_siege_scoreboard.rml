@@ -1,0 +1,41 @@
+<rml>
+<head>
+	<title>Castle Siege scoreboard</title>
+	<link type="text/rcss" href="base.rcss"/>
+	<link type="text/rcss" href="castle_siege_scoreboard.rcss"/>
+</head>
+<body data-model="castle_siege_scoreboard">
+	<!-- The point mode Castle Siege scoreboard (CCastleSiegeScoreboard) on the siege map, above the
+	     siege mini map: the guilds by points, the castle holder marked, the time left, the hero's
+	     guild and the next defense tick; after the battle, the final scores for a while. Its
+	     workspace slot places #panel at the HUD's scale. Text does not scale: each value takes the
+	     native text size and cancels the scale. Takes no pointer events. -->
+	<div class="screen">
+		<div id="panel" data-class-final="final">
+			<div class="title-row">
+				<span class="title counter-scaled" data-style-font-size="bold_text_px + 'px'" data-if="!final">Castle Siege</span>
+				<span class="title counter-scaled" data-style-font-size="bold_text_px + 'px'" data-if="final">Final scores</span>
+				<span class="time counter-scaled" data-style-font-size="bold_text_px + 'px'">{{time_left}}</span>
+			</div>
+			<div class="lines">
+				<div class="line" data-for="line : lines" data-class-holds="line.holds" data-class-own="line.own">
+					<span class="rank counter-scaled" data-style-font-size="text_px + 'px'">{{line.rank}}</span>
+					<span class="name counter-scaled" data-style-font-size="text_px + 'px'">{{line.name}}</span>
+					<span class="holder-mark counter-scaled" data-style-font-size="text_px + 'px'" data-if="line.holds">&#x2605;</span>
+					<span class="points counter-scaled" data-style-font-size="bold_text_px + 'px'">{{line.points}}</span>
+				</div>
+			</div>
+			<div class="footer">
+				<div class="footer-row" data-if="own_guild != ''">
+					<span class="label counter-scaled" data-style-font-size="text_px + 'px'">Your guild</span>
+					<span class="value counter-scaled" data-style-font-size="text_px + 'px'">{{own_guild}}</span>
+				</div>
+				<div class="footer-row" data-if="next_defense_tick != ''">
+					<span class="label counter-scaled" data-style-font-size="text_px + 'px'">Next tick</span>
+					<span class="value counter-scaled" data-style-font-size="text_px + 'px'">{{next_defense_tick}}</span>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</rml>

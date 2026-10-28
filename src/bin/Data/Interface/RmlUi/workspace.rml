@@ -97,6 +97,7 @@
 					<div class="slot" data-window="blood_castle_time"></div>
 					<div class="slot" data-window="chaos_castle_time"></div>
 					<div class="slot" data-window="battle_soccer"></div>
+					<div class="slot" data-window="castle_siege_scoreboard"></div>
 					<div class="slot" data-window="duel"></div>
 					<div class="slot" data-window="kanturu_info"></div>
 					<div class="slot" data-window="empire_guardian_timer"></div>

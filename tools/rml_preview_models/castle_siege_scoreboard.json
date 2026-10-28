@@ -1,0 +1,22 @@
+{
+  "states": {
+    "running": {
+      "bold_text_px": 12, "text_px": 12, "final": false,
+      "time_left": "41:12", "own_guild": "Valhalla #2", "next_defense_tick": "03:41",
+      "lines": [
+        { "rank": "1", "name": "Phoenix", "points": "26", "holds": true, "own": false },
+        { "rank": "2", "name": "Valhalla", "points": "23", "holds": false, "own": true },
+        { "rank": "3", "name": "Ronin", "points": "10", "holds": false, "own": false }
+      ]
+    },
+    "final": {
+      "bold_text_px": 12, "text_px": 12, "final": true,
+      "time_left": "", "own_guild": "Valhalla #1", "next_defense_tick": "",
+      "lines": [
+        { "rank": "1", "name": "Valhalla", "points": "38", "holds": false, "own": true },
+        { "rank": "2", "name": "Phoenix", "points": "29", "holds": true, "own": false },
+        { "rank": "3", "name": "Ronin", "points": "10", "holds": false, "own": false }
+      ]
+    }
+  }
+}
