@@ -38,6 +38,8 @@
 #include "Render/Look/LookProfileSetting.h"
 #include "Render/Look/TuningSetting.h"
 #include "Render/RmlUi/RmlUiRuntime.h"
+#include "GameLogic/Combat/PvpMode.h"
+#include "UI/Core/WindowSystem.h"
 #include "UI/RmlBridge/RmlRuntimeHooks.h"
 #include "Engine/Object/ZzzOpenData.h"
 #include "Scenes/SceneCore.h"
@@ -1410,12 +1412,50 @@ SDL_WindowID ActionWindowId(const SDL_Event& event)
     }
 }
 
+// PvP mode: a double tap of left Ctrl turns it on or off in the game, with a line in the chat.
+static GameLogic::Combat::CtrlDoubleTap g_ctrlTaps;
+
+static void TrackPvpModeTaps(const SDL_Event& event)
+{
+    switch (event.type)
+    {
+    case SDL_EVENT_KEY_DOWN:
+        if (event.key.scancode == SDL_SCANCODE_LCTRL)
+            g_ctrlTaps.OnCtrlDown(SDL_GetTicks());
+        else if (!event.key.repeat)
+            g_ctrlTaps.OnOtherInput();
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        g_ctrlTaps.OnOtherInput();
+        break;
+    case SDL_EVENT_KEY_UP:
+    {
+        extern EGameScene SceneFlag;
+        if (event.key.scancode != SDL_SCANCODE_LCTRL || !g_ctrlTaps.OnCtrlUp(SDL_GetTicks()))
+            break;
+        if (SceneFlag != MAIN_SCENE || RmlUiRuntime::Instance().IsTextInputActive())
+            break;
+
+        const bool on = !GameLogic::Combat::IsPvpModeOn();
+        GameLogic::Combat::SetPvpMode(on);
+        g_pChatListBox->AddText(L"", on ? L"PvP mode ON: you attack players without holding Ctrl (not your party or guild). Double-tap Ctrl to turn it off."
+                                        : L"PvP mode OFF.",
+                                mu::ui::window::TYPE_SYSTEM_MESSAGE);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
 // Physical and scripted input share UI-first routing. Scripted input owns its
 // own legacy held state; it never acquires the OS pointer or replays SDL events.
 bool RouteActionInput(SDL_Event& event, bool synthetic, bool& propagates)
 {
     if (!g_sdlWindow || (synthetic && ActionWindowId(event) != SDL_GetWindowID(g_sdlWindow)))
         return false;
+    if (!synthetic)
+        TrackPvpModeTaps(event);
     propagates = true;
     switch (event.type)
     {

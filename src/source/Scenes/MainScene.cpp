@@ -10,6 +10,8 @@
 #include "SceneCommon.h"
 #include "Camera/CameraUtility.h"
 #include "Render/Textures/ZzzOpenglUtil.h"
+#include "GameLogic/Combat/PvpMode.h"
+#include "Render/Text/CUIRenderText.h"
 #include "Render/Renderer/MuRenderer.h"
 #include "Engine/Object/ZzzObject.h"
 #include "Engine/Object/ZzzCharacter.h"
@@ -660,6 +662,18 @@ static void RenderGameWorld(BYTE& byWaterMap, int width, int height)
 /**
  * @brief Renders UI elements and overlays for the main scene.
  */
+// "PvP MODE" at the top of the screen while PvP mode is on (a double tap of left Ctrl).
+static void RenderPvpModeMarker()
+{
+    if (!GameLogic::Combat::IsPvpModeOn())
+        return;
+
+    g_pRenderText->SetFont(g_hFontBold);
+    g_pRenderText->SetBgColor(0, 0, 0, 160);
+    g_pRenderText->SetTextColor(255, 90, 70, 255);
+    g_pRenderText->RenderText(320, 46, L"PvP MODE", 0, 0, RT3_WRITE_CENTER);
+}
+
 static void RenderMainSceneUI()
 {
     Input::Selection::SelectObjects();
@@ -679,6 +693,7 @@ static void RenderMainSceneUI()
 
     BeginBitmap();
     RenderInfomation();
+    RenderPvpModeMarker();
 
 #ifdef ENABLE_EDIT
     RenderDebugWindow();

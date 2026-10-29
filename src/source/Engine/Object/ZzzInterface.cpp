@@ -69,6 +69,7 @@
 #include "Camera/CameraProjection.h"
 #include "Scenes/SceneCommon.h"
 #include "Render/Text/CUIRenderText.h"
+#include "GameLogic/Combat/PvpMode.h"
 
 #include <iterator>
 
@@ -528,6 +529,20 @@ bool CheckWall(int sx1, int sy1, int sx2, int sy2)
     return true;
 }
 
+// PvP mode (a double tap of left Ctrl) attacks players as if Ctrl were held, but not party or guild
+// members: those still need the real Ctrl, so a mode left on can't hit friends.
+static bool IsPvpModeTarget(CHARACTER* c)
+{
+    if (!GameLogic::Combat::IsPvpModeOn() || c == nullptr || c == Hero || c->Object.Kind != KIND_PLAYER)
+        return false;
+    if (g_pPartyManager->IsPartyMember(SelectedCharacter))
+        return false;
+    if (c->GuildMarkIndex != -1 && Hero->GuildMarkIndex != -1
+        && wcscmp(GuildMark[Hero->GuildMarkIndex].GuildName, GuildMark[c->GuildMarkIndex].GuildName) == 0)
+        return false;
+    return true;
+}
+
 bool CheckAttack_Fenrir(CHARACTER* c)
 {
     if (mu::ui::window::CInventoryCtrl::GetPickedItem())
@@ -668,7 +683,7 @@ bool CheckAttack_Fenrir(CHARACTER* c)
                 return false;
             }
         }
-        else if (c->PK >= PVP_MURDERER2 || (Core::Input::IsKeyDown(VK_CONTROL) && c != Hero))
+        else if (c->PK >= PVP_MURDERER2 || (Core::Input::IsKeyDown(VK_CONTROL) && c != Hero) || IsPvpModeTarget(c))
         {
             return true;
         }
@@ -907,7 +922,7 @@ bool CheckAttack()
                 return false;
             }
         }
-        else if (c->PK >= PVP_MURDERER2 || (Core::Input::IsKeyDown(VK_CONTROL) && c != Hero))
+        else if (c->PK >= PVP_MURDERER2 || (Core::Input::IsKeyDown(VK_CONTROL) && c != Hero) || IsPvpModeTarget(c))
         {
             return true;
         }
@@ -1001,7 +1016,7 @@ int	getTargetCharacterKey(CHARACTER* c, int selected)
         }
     }
 
-    if ((sc->PK >= PVP_MURDERER2 && sc->Object.Kind == KIND_PLAYER) || (Core::Input::IsKeyDown(VK_CONTROL) && sc != Hero))
+    if ((sc->PK >= PVP_MURDERER2 && sc->Object.Kind == KIND_PLAYER) || (Core::Input::IsKeyDown(VK_CONTROL) && sc != Hero) || IsPvpModeTarget(sc))
     {
         return sc->Key;
     }
