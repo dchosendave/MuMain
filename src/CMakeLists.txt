@@ -122,6 +122,11 @@ endif()
 # Editor mode option (for admin builds)
 option(ENABLE_EDITOR "Enable editor features for admin builds" OFF)
 
+# Player builds for MuLauncher: Main only starts with the launcher's token ("/l<token>"), so players
+# always play with up-to-date files. Off for developer builds, which start Main directly.
+option(MU_REQUIRE_LAUNCHER "Only start from MuLauncher (player builds)" OFF)
+set(MU_LAUNCHER_KEY "mu-online-launcher-v1" CACHE STRING "Key of the launcher token, the same as MuLauncher's LaunchToken key")
+
 # Developer control socket: a local socket through which test scripts drive
 # the client (login, move, attack, state, events). Never for player builds:
 # when OFF, none of its sources are compiled and the activation variable does
@@ -712,6 +717,7 @@ target_compile_definitions(MuClient PUBLIC
   $<$<CONFIG:Release>:NDEBUG;_FOREIGN_NDEBUG;LDS_PATCH_GLOBAL_100520>
   $<$<BOOL:${ENABLE_EDITOR}>:_EDITOR>  # Editor features for admin builds
   $<$<BOOL:${ENABLE_CONTROL_SOCKET}>:MU_ENABLE_CONTROL_SOCKET>  # Developer control socket
+  $<$<BOOL:${MU_REQUIRE_LAUNCHER}>:MU_REQUIRE_LAUNCHER;MU_LAUNCHER_KEY="${MU_LAUNCHER_KEY}">  # Only start from MuLauncher
 )
 
 # The effect browser lists the game's create calls of a type, and the item

@@ -63,6 +63,8 @@
 #include "Core/Platform/Imm.h"
 #include "Core/Platform/ProcessLocale.h"
 #include "Core/Platform/ServerPort.h"
+#include "Core/Platform/LauncherToken.h"
+#include <ctime>
 #include "Core/Platform/sdl3/SDLWindowFlags.h"
 #include "Core/Platform/BundledFonts.h"
 #include "Engine/Pathing/ZzzPath.h"
@@ -2051,6 +2053,21 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR szCmdLine, int nC
         szServerIpAddress = serverIPFromConfig.c_str();
         g_ServerPort = GameConfig::GetInstance().GetServerPort();
     }
+
+#ifdef MU_REQUIRE_LAUNCHER
+    // Player builds only start from MuLauncher, which keeps the game files up to date (see
+    // Core/Platform/LauncherToken.h).
+    {
+        std::wstring launcherToken;
+        if (!Util_CheckOption(lpszCommandLine, L'l', launcherToken)
+            || !Core::Platform::IsLauncherTokenValid(launcherToken, static_cast<std::int64_t>(std::time(nullptr)), MU_LAUNCHER_KEY))
+        {
+            g_ErrorReport.Write(L"> Not started from the launcher.\r\n");
+            MessageBox(nullptr, L"Please start the game with the launcher, so it can keep your game files up to date.", L"MU Online", MB_OK | MB_ICONINFORMATION);
+            return 0;
+        }
+    }
+#endif
 
     // #ifdef _DEBUG
 

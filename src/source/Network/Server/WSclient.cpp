@@ -39,6 +39,7 @@
 #include "Engine/Object/PlayerActionState.h"
 #include "Engine/Object/ClassicSwing.h"
 #include "GameLogic/Events/CastleSiegeScoreboard.h"
+#include "GameLogic/Combat/ComboStep.h"
 #include "Scenes/SceneCore.h"
 #include "Network/Reconnect/ReconnectManager.h"
 #include "Network/IncomingPacketQueue.h"
@@ -4129,6 +4130,24 @@ BOOL ReceiveMonsterSkill(const BYTE* ReceiveBuffer, int Size, BOOL bEncrypted)
                           SourceKey, TargetKey);
 
     return (TRUE);
+}
+
+// A follow-up combo of the combo chain: the same combo circle and sound as the first combo, tinted a
+// deeper blue for each step (GameLogic/Combat/ComboStep.h), so players see how far the chain went.
+static void ReceiveComboStep(const GameLogic::Combat::ComboStep& comboStep)
+{
+    const int index = FindCharacterIndex(comboStep.attackerKey);
+    if (index == MAX_CHARACTERS_CLIENT || FindCharacterIndex(comboStep.targetKey) == MAX_CHARACTERS_CLIENT)
+    {
+        return;
+    }
+
+    OBJECT* so = &CharactersClient[index].Object;
+    const auto tint = GameLogic::Combat::ComboStepTint(comboStep.step);
+    vec3_t light;
+    Vector(so->Light[0] * tint[0], so->Light[1] * tint[1], so->Light[2] * tint[2], light);
+    CreateEffect(MODEL_COMBO, so->Position, so->Angle, light);
+    PlayBuffer(SOUND_COMBO);
 }
 
 BOOL ReceiveMagic(const BYTE* ReceiveBuffer, int Size, BOOL bEncrypted)
@@ -14026,7 +14045,14 @@ static void ProcessPacket(const BYTE* ReceiveBuffer, int32_t Size)
     break;
 #endif // ASG_ADD_GENS_SYSTEM
     case GameLogic::CastleSiege::kScoreboardPacketCode:
-        // The point mode Castle Siege scoreboard (C2 FB 01); CCastleSiegeScoreboard shows it.
+        // FB is OpenMU's code for this client's own packets: the combo chain's follow-up combos
+        // (C1 FB 02) and the point mode Castle Siege scoreboard (C2 FB 01, CCastleSiegeScoreboard).
+        if (const auto comboStep = GameLogic::Combat::ParseComboStep(received_span))
+        {
+            ReceiveComboStep(*comboStep);
+            break;
+        }
+
         GameLogic::CastleSiege::g_Scoreboard.Apply(received_span, GetTickCount());
         break;
 

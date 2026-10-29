@@ -90,6 +90,14 @@ mu_add_test(
 )
 
 mu_add_test(
+    NAME test_combo_step
+    SOURCES
+        test_combo_step.cpp
+    LINK_LIBS
+        MuClient
+)
+
+mu_add_test(
     NAME test_castle_siege_scoreboard
     SOURCES
         test_castle_siege_scoreboard.cpp

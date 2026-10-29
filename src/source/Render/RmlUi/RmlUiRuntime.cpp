@@ -93,6 +93,13 @@ void LoadBundledFonts()
     Rml::LoadFontFace("fonts/NotoSansTC-Bold.otf");
     Rml::LoadFontFace("fonts/NanumGothic-Regular.ttf", true);
 
+    // Ascendance MU's own faces: Inter for text and Cinzel (carved Roman capitals) for titles, the
+    // same pair as MuLauncher. The legacy theme's font-body and font-title tokens name them.
+    Rml::LoadFontFace("fonts/Inter-Regular.ttf");
+    Rml::LoadFontFace("fonts/Inter-Bold.ttf");
+    Rml::LoadFontFace("fonts/Cinzel-Regular.ttf");
+    Rml::LoadFontFace("fonts/Cinzel-Bold.ttf");
+
     // Third, explicitly-named face -- already bundled for the legacy GDI text shim's own font
     // picker (BundledFonts.h) but never previously registered with RmlUi. Loaded for its Unicode
     // symbol coverage: the modern theme's login/char-select icon buttons (base.rcss's
