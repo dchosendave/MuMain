@@ -112,6 +112,8 @@ void GameConfig::Load()
     m_disableWingShadow = ReadBool(CfgSectionRender, CfgKeyDisableWingShadow, CfgDefaultDisableWingShadow);
     m_disableBodyShadows = ReadBool(CfgSectionRender, CfgKeyDisableBodyShadows, CfgDefaultDisableBodyShadows);
     m_fpsCap = ReadInt(CfgSectionRender, CfgKeyFpsCap, CfgDefaultFpsCap);
+    if (m_fpsCap > 0 && m_fpsCap < CfgMinFpsCap)
+        m_fpsCap = CfgMinFpsCap;
     m_texturePack = ReadString(CfgSectionRender, CfgKeyTexturePack, CfgDefaultTexturePack);
 
     // Strip keys/sections we used to write but no longer use, so user config

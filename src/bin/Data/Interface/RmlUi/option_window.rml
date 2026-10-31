@@ -487,7 +487,7 @@
 				<div class="checkbox-tick"></div>
 			</div>
 		</div>
-		<div class="option-row option-checkbox-row" data-event-click="option_toggle_show_debug_info">
+		<div class="option-row option-checkbox-row" data-if="debug_info_available" data-event-click="option_toggle_show_debug_info">
 			<span class="option-row-label">{{show_debug_info_label}}</span>
 			<div class="checkbox-box" data-class-checked="show_debug_info">
 				<div class="checkbox-tick"></div>

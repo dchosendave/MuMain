@@ -462,7 +462,7 @@
 						<span class="opt-label">{{show_fps_counter_label}}</span>
 						<div class="opt-control"><div class="opt-toggle" data-class-checked="show_fps_counter"><div class="opt-toggle-knob"></div></div></div>
 					</div>
-					<div class="opt-row opt-toggle-row" data-event-click="option_toggle_show_debug_info">
+					<div class="opt-row opt-toggle-row" data-if="debug_info_available" data-event-click="option_toggle_show_debug_info">
 						<span class="opt-label">{{show_debug_info_label}}</span>
 						<div class="opt-control"><div class="opt-toggle" data-class-checked="show_debug_info"><div class="opt-toggle-knob"></div></div></div>
 					</div>

@@ -383,6 +383,11 @@ namespace mu::ui::window
             Rml::String showFpsCounterLabel;
             bool showDebugInfo = false;
             Rml::String showDebugInfoLabel;
+#ifdef MU_REQUIRE_LAUNCHER
+            bool debugInfoAvailable = false;  // Player builds hide the debug overlay
+#else
+            bool debugInfoAvailable = true;
+#endif
             std::vector<Rml::String> themeLabels;
             int themeIndex = 0;
             Rml::String themeRowLabel;

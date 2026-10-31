@@ -182,8 +182,9 @@ static const int s_NumFonts = sizeof(s_Fonts) / sizeof(s_Fonts[0]);
 
 // FPS cap choices offered by the Video tab's FPS Limit row -- -1 matches SceneManager::SetTargetFps's
 // own "uncapped" sentinel and GameConfig::GetFpsCap()'s default, so "Uncapped" doubles as this
-// setting's untouched-by-the-user state (see Winmain.cpp's EffectiveOffVSyncTargetFps()).
-static const int s_FpsCapValues[] = { 24, 30, 60, 120, 144, -1 };
+// setting's untouched-by-the-user state (see Winmain.cpp's EffectiveOffVSyncTargetFps()). Nothing
+// below CfgMinFpsCap: the game is tuned for 60 FPS and up.
+static const int s_FpsCapValues[] = { 60, 120, 144, -1 };
 static const int s_NumFpsCapValues = sizeof(s_FpsCapValues) / sizeof(s_FpsCapValues[0]);
 
 // The Video tab's Anti-aliasing and Anisotropic filtering rows, in the values config.ini holds
@@ -486,6 +487,7 @@ void mu::ui::window::COptionWindow::BindRmlModel(Rml::DataModelConstructor& c, O
     c.Bind("show_fps_counter_label", &model.showFpsCounterLabel);
     c.Bind("show_debug_info", &model.showDebugInfo);
     c.Bind("show_debug_info_label", &model.showDebugInfoLabel);
+    c.Bind("debug_info_available", &model.debugInfoAvailable);
     c.Bind("theme_labels", &model.themeLabels);
     c.Bind("theme_index", &model.themeIndex);
     c.Bind("theme_row_label", &model.themeRowLabel);
@@ -1329,6 +1331,8 @@ void mu::ui::window::COptionWindow::RmlToggleShowFpsCounter()
 
 void mu::ui::window::COptionWindow::RmlToggleShowDebugInfo()
 {
+    if (!m_RmlView.GetModel().debugInfoAvailable)
+        return;
     SetShowDebugInfo(!GetShowDebugInfo());
 }
 

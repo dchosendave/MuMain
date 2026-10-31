@@ -160,6 +160,7 @@ namespace CfgDefaults
     inline constexpr bool CfgDefaultDisableWingShadow = false;
     inline constexpr bool CfgDefaultDisableBodyShadows = false;
     inline constexpr int CfgDefaultFpsCap = -1;  // Uncapped
+    inline constexpr int CfgMinFpsCap = 60;      // Lower caps from older config files are raised to it
     inline constexpr wchar_t CfgDefaultTexturePack[] = L""; // The original textures
 
     // "default" = this app's own platform-aware pick (prefers Vulkan on Windows to avoid

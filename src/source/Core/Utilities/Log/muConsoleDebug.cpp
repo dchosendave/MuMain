@@ -226,6 +226,11 @@ void ListDebugWindows()
 
 bool CmuConsoleDebug::CheckCommand(const std::wstring& strCommand)
 {
+#ifdef MU_REQUIRE_LAUNCHER
+    // Player builds have no developer commands ($details, $fps, $win, ...): the text is plain chat.
+    return false;
+#endif
+
     if (Core::Benchmark::Console::HandleCommand(strCommand))
     {
         return true;
